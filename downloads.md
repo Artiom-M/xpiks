@@ -65,6 +65,17 @@ permalink: /downloads/
 <h2><strong>Linux instructions</strong></h2>
 
 <div class="download-package">
+<a href="https://github.com/Ribtoks/xpiks/releases/download/v1.4.2/xpiks-qt-v1.4.2.AppImage">
+<div><img src="{{site.url}}/images/appimage-package-install.png" style="vertical-align: middle;width:70px;" />
+<span style="vertical-align: middle;">Package for Linux</span>
+</div>
+</a>
+</div>
+
+<p class="download-description">This is a universal AppImage package. Download it, allow execution as a program in Properties and open. Read more about <a href="http://appimage.org/">AppImage here.</a></p>
+
+<!--
+<div class="download-package">
 <a href="https://github.com/Ribtoks/xpiks/releases/download/v1.4.0/xpiks_1.4_amd64.deb">
 <div><img src="{{site.url}}/images/linux_installer.jpg" style="vertical-align: middle;width:70px;" />
 <span style="vertical-align: middle;">Package for Debian</span>
@@ -85,7 +96,7 @@ permalink: /downloads/
 </div>
 
 <p class="download-description">Package is only for rpm-based distros (OpenSUSE, Fedora etc.) with x64 architecture. See <a href="{{site.url}}/linux-instructions/">installation instructions for Linux</a> page.</p>
-
+-->
 <div style="clear:both;height: 30px;">&nbsp;</div>
 
 <h2><strong>Other systems and versions</strong></h2>
