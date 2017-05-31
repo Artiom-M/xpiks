@@ -16,7 +16,7 @@ permalink: /faq/
 <div>
   <ul>
     <li><strong>Autocompletion does not work though "Autocomplete keywords" option is ON</strong></li>
-    <li>Please check if you have Xpiks "installed" in some sort of cloud storage like Google Drive, Dropbox etc. Move it to the local hard drive (it "weights" nothing anyway) and try again. Go to support of the problem persists.</li>
+    <li>Please check if you have Xpiks "installed" in some sort of cloud storage like Google Drive, Dropbox etc. Move it to the local hard drive (it "weights" nothing anyway) and try again. Go to support if the problem persists.</li>
   </ul>
 </div>
 
