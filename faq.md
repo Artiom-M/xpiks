@@ -15,6 +15,13 @@ permalink: /faq/
 
 <div>
   <ul>
+    <li><strong>Autocompletion does not work though "Autocomplete keywords" option is ON</strong></li>
+    <li>Please check if you have Xpiks "installed" in some sort of cloud storage like Google Drive, Dropbox etc. Move it to the local hard drive (it "weights" nothing anyway) and try again. Go to support of the problem persists.</li>
+  </ul>
+</div>
+
+<div>
+  <ul>
     <li><strong>I downloaded <i>Xpiks-qt-v1.1.4.zip</i> and what the hell I have to do next?</strong></li>
     <li>Xpiks will have an installer for Windows soon. Meanwhile extract zip archive to any place you want to (e.g. <code class="highlighter-rouge">C:\</code>), go inside and double-click the file <strong>xpiks-qt.exe</strong></li>
   </ul>
