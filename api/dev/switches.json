@@ -1,4 +1,5 @@
 {
     "overwrite": false,
-    "donateCampaign1": false
+    "donateCampaign1": false,
+    "donateCampaign1Dialog": false
 }
