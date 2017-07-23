@@ -2,5 +2,5 @@
     "overwrite": true,
     "donateCampaign1": false,
     "donateCampaign1Stage2": false,
-    "sequentialSuggestionPreviews": true
+    "progressiveSuggestionPreviews": true
 }
