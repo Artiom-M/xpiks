@@ -17,12 +17,12 @@ permalink: /support/
             width="900"
             height="700">
     </iframe>
+    
     <script type="text/javascript">
      document.getElementById('forum_embed').src =
      'https://groups.google.com/forum/embed/?place=forum/xpiks-support'
      + '&showsearch=true&showpopout=true&showtabs=false'
      + '&parenturl=' + encodeURIComponent(window.location.href);
-    </script>
     </script>
   </section>
 </article>
