@@ -1,0 +1,13 @@
+{
+	"plans": [
+		{
+			"name": "test plan 1",
+			"properties": [
+				{
+					"propertyId": 0,
+					"propertyName": "Empty"
+				}
+			]
+		}
+	]
+}
