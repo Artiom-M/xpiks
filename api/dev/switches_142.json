@@ -18,5 +18,9 @@
     "qualityVideoPreviews": {
         "v": true,
         "t": 30
+    },
+    "autoImport": {
+        "v": true,
+        "t": 40
     }
 }
