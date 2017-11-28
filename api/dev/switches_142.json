@@ -20,7 +20,6 @@
         "t": 30
     },
     "autoImport": {
-        "v": true,
-        "t": 35
+        "v": true
     }
 }
