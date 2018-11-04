@@ -12,6 +12,8 @@ zlib-1.2.*/
 hunspell-1.6.0
 *.lib
 *.o
+*.a
+.qmake.stash
 moc_*.cpp
 *.exe
 installer/packages/xpiks/data/
