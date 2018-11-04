@@ -65,7 +65,6 @@ namespace Maintenance {
         possiblePaths << downloadsDir.filePath("exiftool.exe");
 #elif defined(Q_OS_LINUX)
         possiblePaths << "/usr/bin/exiftool" << "/usr/local/bin/exiftool";
-        // TODO: add path inside AppImage
 #else
         // BUMP
 #endif

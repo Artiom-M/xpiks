@@ -68,6 +68,7 @@ namespace Connectivity {
 #else
             m_BaseUrl = "https://ribtoks.github.io/xpiks/api/v1/";
 #endif
+            m_BaseUrl = "http://localhost/";
         }
 
         ApiManager(ApiManager const&);

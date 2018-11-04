@@ -91,7 +91,6 @@ namespace Helpers {
     }
 
     void Helpers::HelpersQmlWrapper::reportOpen() {
-        m_CommandManager->reportUserAction(Connectivity::UserAction::Open);
     }
 
     void HelpersQmlWrapper::setProgressIndicator(QQuickWindow *window) {

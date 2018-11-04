@@ -65,7 +65,6 @@ namespace Models {
         LOG_DEBUG << "#";
         auto allArtworks = getAllOriginalItems();
         m_CommandManager->submitForSpellCheck(allArtworks);
-        m_CommandManager->reportUserAction(Connectivity::UserAction::SpellCheck);
     }
 
     int FilteredArtItemsProxyModel::getOriginalIndex(int index) const {
@@ -190,7 +189,6 @@ namespace Models {
         LOG_DEBUG << "#";
         auto selectedArtworks = getSelectedOriginalItems();
         m_CommandManager->submitForSpellCheck(selectedArtworks);
-        m_CommandManager->reportUserAction(Connectivity::UserAction::SpellCheck);
     }
 
     int FilteredArtItemsProxyModel::getModifiedSelectedCount(bool overwriteAll) {

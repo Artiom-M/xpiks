@@ -10,7 +10,7 @@
 
 #include "ziphelper.h"
 #include <QFileInfo>
-#include <quazip/JlCompress.h>
+#include <quazip5/JlCompress.h>
 #include "filehelpers.h"
 #include "../Common/defines.h"
 

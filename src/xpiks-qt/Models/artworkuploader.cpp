@@ -255,7 +255,6 @@ namespace Models {
         uploadInfoRepository->updatePercentages();
 
         m_FtpCoordinator->uploadArtworks(snapshot, selectedInfos);
-        m_CommandManager->reportUserAction(Connectivity::UserAction::Upload);
     }
 
     bool ArtworkUploader::removeUnavailableItems() {

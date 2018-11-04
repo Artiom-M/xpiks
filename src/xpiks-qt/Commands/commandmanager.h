@@ -252,7 +252,6 @@ namespace Commands {
     public:
         void saveArtworkBackup(Models::ArtworkMetadata *metadata) const;
         void saveArtworksBackups(const MetadataIO::WeakArtworksSnapshot &artworks) const;
-        void reportUserAction(Connectivity::UserAction userAction) const;
         void afterConstructionCallback();
 
     private:
@@ -355,7 +354,7 @@ namespace Commands {
         SpellCheck::SpellCheckerService *m_SpellCheckerService;
         SpellCheck::SpellCheckSuggestionModel *m_SpellCheckSuggestionModel;
         MetadataIO::MetadataIOService *m_MetadataIOService;
-        Connectivity::TelemetryService *m_TelemetryService;
+        //Connectivity::TelemetryService *m_TelemetryService;
         Connectivity::UpdateService *m_UpdateService;
         Models::LogsModel *m_LogsModel;
         MetadataIO::MetadataIOCoordinator *m_MetadataIOCoordinator;

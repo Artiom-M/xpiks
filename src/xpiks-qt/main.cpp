@@ -41,7 +41,6 @@
 #include "Translation/translationservice.h"
 #include "Models/recentdirectoriesmodel.h"
 #include "QMLExtensions/triangleelement.h"
-#include "Connectivity/telemetryservice.h"
 #include "MetadataIO/metadataioservice.h"
 #include "Suggestion/keywordssuggestor.h"
 #include "SpellCheck/userdicteditmodel.h"
@@ -304,7 +303,7 @@ int main(int argc, char *argv[]) {
     sessionManager.initialize();
     QuickBuffer::QuickBuffer quickBuffer;
     Maintenance::MaintenanceService maintenanceService;
-    QMLExtensions::VideoCachingService videoCachingService;
+    //QMLExtensions::VideoCachingService videoCachingService;
     QMLExtensions::ArtworksUpdateHub artworksUpdateHub;
     artworksUpdateHub.setStandardRoles(artItemsModel.getArtworkStandardRoles());
     Models::SwitcherModel switcherModel;
@@ -313,16 +312,13 @@ int main(int argc, char *argv[]) {
     SpellCheck::DuplicatesReviewModel duplicatesModel(&colorsModel);
     MetadataIO::CsvExportModel csvExportModel;
 
-    Connectivity::UpdateService updateService(&settingsModel);
+    //Connectivity::UpdateService updateService(&settingsModel);
 
     MetadataIO::MetadataIOCoordinator metadataIOCoordinator;
 
-#if defined(QT_NO_DEBUG)
-    const bool telemetryEnabled = settingsModel.getIsTelemetryEnabled();
-#else
-    const bool telemetryEnabled = false;
-#endif
-    Connectivity::TelemetryService telemetryService(userId, telemetryEnabled);
+    //const bool telemetryEnabled = false;
+
+ //   Connectivity::TelemetryService telemetryService(userId, telemetryEnabled);
 
     Plugins::PluginManager pluginManager;
     Plugins::PluginsWithActionsModel pluginsWithActions;
@@ -350,8 +346,8 @@ int main(int argc, char *argv[]) {
     commandManager.InjectDependency(&spellCheckerService);
     commandManager.InjectDependency(&spellCheckSuggestionModel);
     commandManager.InjectDependency(&metadataIOService);
-    commandManager.InjectDependency(&telemetryService);
-    commandManager.InjectDependency(&updateService);
+    //commandManager.InjectDependency(&telemetryService);
+    //commandManager.InjectDependency(&updateService);
     commandManager.InjectDependency(&logsModel);
     commandManager.InjectDependency(&metadataIOCoordinator);
     commandManager.InjectDependency(&pluginManager);
@@ -372,7 +368,7 @@ int main(int argc, char *argv[]) {
     commandManager.InjectDependency(&warningsModel);
     commandManager.InjectDependency(&quickBuffer);
     commandManager.InjectDependency(&maintenanceService);
-    commandManager.InjectDependency(&videoCachingService);
+    //commandManager.InjectDependency(&videoCachingService);
     commandManager.InjectDependency(&artworksUpdateHub);
     commandManager.InjectDependency(&switcherModel);
     commandManager.InjectDependency(&requestsService);
@@ -400,7 +396,7 @@ int main(int argc, char *argv[]) {
     colorsModel.initializeBuiltInThemes();
     logsModel.InjectDependency(&colorsModel);
 
-    telemetryService.setInterfaceLanguage(languagesModel.getCurrentLanguage());
+    //telemetryService.setInterfaceLanguage(languagesModel.getCurrentLanguage());
     colorsModel.applyTheme(settingsModel.getSelectedThemeIndex());
 
     qmlRegisterType<Helpers::ClipboardHelper>("xpiks", 1, 0, "ClipboardHelper");

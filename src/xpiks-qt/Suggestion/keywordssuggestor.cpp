@@ -305,11 +305,6 @@ namespace Suggestion {
             SearchQuery query(searchTerm, resultsType, engine->getMaxResults());
             engine->submitQuery(query);
 
-            if (dynamic_cast<LocalLibraryQueryEngine*>(engine) == NULL) {
-                m_CommandManager->reportUserAction(Connectivity::UserAction::SuggestionRemote);
-            } else {
-                m_CommandManager->reportUserAction(Connectivity::UserAction::SuggestionLocal);
-            }
         }
     }
 

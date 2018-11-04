@@ -115,8 +115,8 @@ namespace MetadataIO {
         // this should prevent a race between video thumbnails and exiftool
         // https://github.com/ribtoks/xpiks/issues/477
         // ---
-        QMLExtensions::VideoCachingService *videoCachingService = m_CommandManager->getVideoCachingService();
-        videoCachingService->waitWorkerIdle();
+        //QMLExtensions::VideoCachingService *videoCachingService = m_CommandManager->getVideoCachingService();
+        //videoCachingService->waitWorkerIdle();
         // ---
 
         libxpks::io::WritingOrchestrator writingOrchestrator(artworksToWrite,

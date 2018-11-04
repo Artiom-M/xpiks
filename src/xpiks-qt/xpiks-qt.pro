@@ -55,7 +55,6 @@ SOURCES += main.cpp \
     SpellCheck/spellcheckerrorshighlighter.cpp \
     SpellCheck/spellcheckiteminfo.cpp \
     SpellCheck/spellsuggestionsitem.cpp \
-    Connectivity/telemetryservice.cpp \
     Connectivity/updatescheckerworker.cpp \
     Warnings/warningscheckingworker.cpp \
     MetadataIO/metadataiocoordinator.cpp \
@@ -97,7 +96,6 @@ SOURCES += main.cpp \
     Models/artworksviewmodel.cpp \
     Helpers/keywordshelpers.cpp \
     Connectivity/uploadwatcher.cpp \
-    Connectivity/telemetryworker.cpp \
     Warnings/warningssettingsmodel.cpp \
     Connectivity/simplecurlrequest.cpp \
     Connectivity/curlinithelper.cpp \
@@ -249,7 +247,6 @@ HEADERS += \
     Common/itemprocessingworker.h \
     SpellCheck/spellsuggestionsitem.h \
     Connectivity/analyticsuserevent.h \
-    Connectivity/telemetryservice.h \
     Connectivity/updatescheckerworker.h \
     Warnings/warningscheckingworker.h \
     Warnings/warningsitem.h \
@@ -309,7 +306,6 @@ HEADERS += \
     Helpers/keywordshelpers.h \
     Connectivity/uploadwatcher.h \
     Common/iflagsprovider.h \
-    Connectivity/telemetryworker.h \
     Warnings/warningssettingsmodel.h \
     Connectivity/simplecurlrequest.h \
     Connectivity/curlinithelper.h \
@@ -564,10 +560,11 @@ LIBS += -lhunspell
 LIBS += -lcurl
 LIBS += -lface
 LIBS += -lssdll
-LIBS += -lquazip
+LIBS += -lquazip5
 LIBS += -lz
 LIBS += -lthmbnlr
 LIBS += -lxpks
+LIBS += -ldl
 
 BUILDNO=$$system(git log -n 1 --pretty=format:"%h")
 BRANCH_NAME=$$system(git rev-parse --abbrev-ref HEAD)
@@ -581,95 +578,6 @@ CONFIG(debug, debug|release)  {
 } else {
     DEFINES += WITH_LOGS
     message("Building release")
-}
-
-macx {
-    INCLUDEPATH += "../../vendors/quazip"
-    INCLUDEPATH += "../../vendors/libcurl/include"
-
-    HUNSPELL_DICT_FILES.files = deps/dict/en_US.aff deps/dict/en_US.dic deps/dict/license.txt deps/dict/README_en_US.txt
-    HUNSPELL_DICT_FILES.path = Contents/Resources
-    QMAKE_BUNDLE_DATA += HUNSPELL_DICT_FILES
-
-    WHATS_NEW.files = deps/whatsnew.txt
-    WHATS_NEW.path = Contents/Resources
-    QMAKE_BUNDLE_DATA += WHATS_NEW
-
-    TERMS_AND_CONDITIONS.files = deps/terms_and_conditions.txt
-    TERMS_AND_CONDITIONS.path = Contents/Resources
-    QMAKE_BUNDLE_DATA += TERMS_AND_CONDITIONS
-
-    TRANSLATIONS_FILES_LIST = $$system(ls $$PWD/deps/translations/*.qm)
-    XPIKS_TRANSLATIONS.files = $$TRANSLATIONS_FILES_LIST
-    XPIKS_TRANSLATIONS.path = Contents/Resources/translations
-    QMAKE_BUNDLE_DATA += XPIKS_TRANSLATIONS
-
-    FREQ_TABLES.files = deps/en_wordlist.tsv
-    FREQ_TABLES.path = Contents/Resources
-    QMAKE_BUNDLE_DATA += FREQ_TABLES
-}
-
-win32 {
-    DEFINES += QT_NO_PROCESS_COMBINED_ARGUMENT_START
-    QT += winextras
-    DEFINES += ZLIB_WINAPI \
-               ZLIB_DLL
-    INCLUDEPATH += "../../vendors/zlib-1.2.11"
-    INCLUDEPATH += "../../vendors/quazip"
-    INCLUDEPATH += "../../vendors/libcurl/include"
-
-    LIBS -= -lcurl
-
-    CONFIG(debug, debug|release) {
-        EXE_DIR = debug
-        LIBS += -llibcurl_debug
-        LIBS -= -lquazip
-        LIBS += -lquazipd
-    }
-
-    CONFIG(release, debug|release) {
-        EXE_DIR = release
-        LIBS += -llibcurl
-    }
-
-    LIBS += -lmman
-
-    TR_DIR = translations
-
-    exists($$OUT_PWD/$$EXE_DIR/$$TR_DIR/) {
-        message("Translations exist")
-    } else {
-        createtranslations.commands += $(MKDIR) \"$$shell_path($$OUT_PWD/$$EXE_DIR/$$TR_DIR)\"
-        QMAKE_EXTRA_TARGETS += createtranslations
-        POST_TARGETDEPS += createtranslations
-    }
-
-    AC_SOURCES_DIR = ac_sources
-
-    exists($$OUT_PWD/$$EXE_DIR/$$AC_SOURCES_DIR/) {
-        message("ac_sources exist")
-    } else {
-        create_ac_sources.commands += $(MKDIR) \"$$shell_path($$OUT_PWD/$$EXE_DIR/$$AC_SOURCES_DIR)\"
-        QMAKE_EXTRA_TARGETS += create_ac_sources
-        POST_TARGETDEPS += create_ac_sources
-    }
-
-    copywhatsnew.commands = $(COPY_FILE) \"$$shell_path($$PWD/deps/whatsnew.txt)\" \"$$shell_path($$OUT_PWD/$$EXE_DIR/)\"
-    copyterms.commands = $(COPY_FILE) \"$$shell_path($$PWD/deps/terms_and_conditions.txt)\" \"$$shell_path($$OUT_PWD/$$EXE_DIR/)\"
-    copydicts.commands = $(COPY_DIR) \"$$shell_path($$PWD/deps/dict)\" \"$$shell_path($$OUT_PWD/$$EXE_DIR/dict)\"
-
-    appveyor {
-        DEFINES += WITH_LOGS
-        LIBS += -L"$$PWD/../../libs"
-        copytranslations.commands = echo "Skip translations"
-    } else {
-        copytranslations.commands = $(COPY_FILE) \"$$shell_path($$PWD/deps/$$TR_DIR/xpiks_*.qm)\" \"$$shell_path($$OUT_PWD/$$EXE_DIR/$$TR_DIR/)\"
-    }
-
-    copyfreqtables.commands = $(COPY_FILE) \"$$shell_path($$PWD/deps/en_wordlist.tsv)\" \"$$shell_path($$OUT_PWD/$$EXE_DIR/$$AC_SOURCES_DIR/)\"
-
-    QMAKE_EXTRA_TARGETS += copywhatsnew copyterms copydicts copytranslations copyfreqtables
-    POST_TARGETDEPS += copywhatsnew copyterms copydicts copytranslations copyfreqtables
 }
 
 travis-ci {
@@ -695,15 +603,6 @@ linux-g++-64 {
 
     UNAME = $$system(cat /proc/version | tr -d \'()\')
 
-    contains( UNAME, Debian|Ubuntu ) {
-        message("distribution : Debian")
-        LIBS -= -lquazip
-        LIBS += -lquazip5
-    }
-
-    contains( UNAME, SUSE ) {
-        message("distribution : SUSE")
-    }
 }
 
 linux-qtcreator {

@@ -32,7 +32,6 @@
 #include "../Models/settingsmodel.h"
 #include "../SpellCheck/spellchecksuggestionmodel.h"
 #include "../MetadataIO/metadataioservice.h"
-#include "../Connectivity/telemetryservice.h"
 #include "../Connectivity/updateservice.h"
 #include "../Models/logsmodel.h"
 #include "../Encryption/aes-qt.h"
@@ -85,8 +84,8 @@ Commands::CommandManager::CommandManager():
     m_SpellCheckerService(NULL),
     m_SpellCheckSuggestionModel(NULL),
     m_MetadataIOService(NULL),
-    m_TelemetryService(NULL),
-    m_UpdateService(NULL),
+    //m_TelemetryService(NULL),
+    //m_UpdateService(NULL),
     m_LogsModel(NULL),
     m_MetadataIOCoordinator(NULL),
     m_PluginManager(NULL),
@@ -213,13 +212,6 @@ void Commands::CommandManager::InjectDependency(MetadataIO::MetadataIOService *m
     m_MetadataIOService->setCommandManager(this);
 }
 
-void Commands::CommandManager::InjectDependency(Connectivity::TelemetryService *telemetryService) {
-    Q_ASSERT(telemetryService != NULL); m_TelemetryService = telemetryService;
-}
-
-void Commands::CommandManager::InjectDependency(Connectivity::UpdateService *updateService) {
-    Q_ASSERT(updateService != NULL); m_UpdateService = updateService;
-}
 
 void Commands::CommandManager::InjectDependency(Models::LogsModel *logsModel) {
     Q_ASSERT(logsModel != NULL); m_LogsModel = logsModel;
@@ -410,10 +402,6 @@ void Commands::CommandManager::connectEntitiesSignalsSlots() const {
     }
 
 #ifndef CORE_TESTS
-    if (m_SettingsModel != NULL && m_TelemetryService != NULL) {
-        QObject::connect(m_SettingsModel, &Models::SettingsModel::userStatisticsChanged,
-                         m_TelemetryService, &Connectivity::TelemetryService::changeReporting);
-    }
 
     if (m_LanguagesModel != NULL && m_KeywordsSuggestor != NULL) {
         QObject::connect(m_LanguagesModel, &Models::LanguagesModel::languageChanged,
@@ -525,8 +513,8 @@ void Commands::CommandManager::ensureDependenciesInjected() {
     Q_ASSERT(m_SpellCheckerService != NULL);
     Q_ASSERT(m_SpellCheckSuggestionModel != NULL);
     Q_ASSERT(m_MetadataIOService != NULL);
-    Q_ASSERT(m_TelemetryService != NULL);
-    Q_ASSERT(m_UpdateService != NULL);
+    //Q_ASSERT(m_TelemetryService != NULL);
+   // Q_ASSERT(m_UpdateService != NULL);
     Q_ASSERT(m_LogsModel != NULL);
     Q_ASSERT(m_MetadataIOCoordinator != NULL);
     Q_ASSERT(m_PluginManager != NULL);
@@ -544,7 +532,7 @@ void Commands::CommandManager::ensureDependenciesInjected() {
     Q_ASSERT(m_WarningsModel != NULL);
     Q_ASSERT(m_QuickBuffer != NULL);
     Q_ASSERT(m_MaintenanceService != NULL);
-    Q_ASSERT(m_VideoCachingService != NULL);
+    //Q_ASSERT(m_VideoCachingService != NULL);
     Q_ASSERT(m_RequestsService != NULL);
     Q_ASSERT(m_ArtworksUpdateHub != NULL);
     Q_ASSERT(m_DuplicatesModel != NULL);
@@ -894,14 +882,12 @@ void Commands::CommandManager::setupSpellCheckSuggestions(Common::IMetadataOpera
     Q_ASSERT(item != NULL);
     if (m_SpellCheckSuggestionModel) {
         m_SpellCheckSuggestionModel->setupModel(item, index, flags);
-        reportUserAction(Connectivity::UserAction::SpellSuggestions);
     }
 }
 
 void Commands::CommandManager::setupSpellCheckSuggestions(std::vector<std::pair<Common::IMetadataOperator *, int> > &itemPairs, Common::SuggestionFlags flags) {
     if (m_SpellCheckSuggestionModel) {
         m_SpellCheckSuggestionModel->setupModel(itemPairs, flags);
-        reportUserAction(Connectivity::UserAction::SpellSuggestions);
     }
 }
 
@@ -997,16 +983,6 @@ void Commands::CommandManager::saveArtworksBackups(const MetadataIO::WeakArtwork
 #endif
 }
 
-void Commands::CommandManager::reportUserAction(Connectivity::UserAction userAction) const {
-#ifndef CORE_TESTS
-    if (m_TelemetryService) {
-        m_TelemetryService->reportAction(userAction);
-    }
-#else
-    Q_UNUSED(userAction);
-#endif
-}
-
 void Commands::CommandManager::afterConstructionCallback() {
     if (m_AfterInitCalled) {
         LOG_WARNING << "Attempt to call afterConstructionCallback() second time";
@@ -1039,7 +1015,7 @@ void Commands::CommandManager::afterConstructionCallback() {
 
     m_MaintenanceService->startService();
     m_ImageCachingService->startService(coordinatorParams);
-    m_VideoCachingService->startService();
+    //m_VideoCachingService->startService();
     m_MetadataIOService->startService();
 #endif
     m_SpellCheckerService->startService(coordinatorParams);
@@ -1054,10 +1030,10 @@ void Commands::CommandManager::afterConstructionCallback() {
         QLatin1String(
             "cc39a47f60e1ed812e2403b33678dd1c529f1cc43f66494998ec478a4d13496269a3dfa01f882941766dba246c76b12b2a0308e20afd84371c41cf513260f8eb8b71f8c472cafb1abf712c071938ec0791bbf769ab9625c3b64827f511fa3fbb");
     QString endpoint = Encryption::decodeText(reportingEndpoint, "reporting");
-    m_TelemetryService->setEndpoint(endpoint);
+    //m_TelemetryService->setEndpoint(endpoint);
 
-    m_TelemetryService->startReporting();
-    m_UpdateService->startChecking();
+    //m_TelemetryService->startReporting();
+    //m_UpdateService->startChecking();
     m_ArtworkUploader->initializeStocksList(&m_InitCoordinator);
     m_WarningsService->initWarningsSettings();
     m_TranslationManager->initializeDictionaries();
@@ -1228,8 +1204,8 @@ void Commands::CommandManager::beforeDestructionCallback() const {
 
 #ifndef CORE_TESTS
     m_ImageCachingService->stopService();
-    m_VideoCachingService->stopService();
-    m_UpdateService->stopChecking();
+    //m_VideoCachingService->stopService();
+    //m_UpdateService->stopChecking();
     m_MetadataIOService->stopService();
 #endif
     m_SpellCheckerService->stopService();
@@ -1242,10 +1218,6 @@ void Commands::CommandManager::beforeDestructionCallback() const {
 #ifndef CORE_TESTS
     m_MaintenanceService->stopService();
     m_DatabaseManager->prepareToFinalize();
-
-    // we have a second for important? stuff
-    m_TelemetryService->reportAction(Connectivity::UserAction::Close);
-    m_TelemetryService->stopReporting();
     m_RequestsService->stopService();
 #endif
 }
