@@ -1,0 +1,5 @@
+debian/xpiks.desktop usr/share/applications
+debian/xpiks.png usr/share/icons
+src/xpiks-qt/deps/whatsnew.txt usr/share/Xpiks/Xpiks
+src/xpiks-qt/deps/terms_and_conditions.txt usr/share/Xpiks/Xpiks
+src/xpiks-qt/deps/translations/*.qm usr/share/Xpiks/Xpiks/translations

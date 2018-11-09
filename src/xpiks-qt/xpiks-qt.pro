@@ -6,7 +6,7 @@ QT += qml quick widgets concurrent svg
 CONFIG += qtquickcompiler
 CONFIG += c++11
 
-VERSION = 1.4.2.0
+VERSION = 1.5.2.1
 QMAKE_TARGET_PRODUCT = Xpiks
 QMAKE_TARGET_DESCRIPTION = "Cross-Platform Image Keywording Software"
 QMAKE_TARGET_COPYRIGHT = "Copyright (C) 2014-2017 Taras Kushnir"
@@ -185,9 +185,6 @@ QML_IMPORT_PATH =
 ICON = xpiks-qt.icns
 
 RC_ICONS = xpiks-qt.ico
-
-# Default rules for deployment.
-include(deployment.pri)
 
 HEADERS += \
     Models/artitemsmodel.h \
@@ -593,7 +590,7 @@ travis-ci {
     SOURCES += ../../vendors/libthmbnlr/thumbnailcreator_stub.cpp
 }
 
-linux-g++-64 {
+unix:!macx {
     message("for Linux")
     target.path=/usr/bin/
 
@@ -602,7 +599,7 @@ linux-g++-64 {
     BUILDNO = $$system($$PWD/buildno.sh)
 
     UNAME = $$system(cat /proc/version | tr -d \'()\')
-
+    #QMAKE_PRE_LINK=$$PWD/build_vendors_linux.sh
 }
 
 linux-qtcreator {
@@ -622,6 +619,9 @@ linux-static {
     DEFINES += STATIC
     message("Static build.")
 }
+
+# Default rules for deployment.
+include(deployment.pri)
 
 DEFINES += BUILDNUMBER=$${BUILDNO}
 DEFINES += BRANCHNAME=$${BRANCH_NAME}

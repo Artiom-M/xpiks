@@ -1,4 +1,8 @@
+Makefile
+src/*/Makefile
+vendors/*/Makefile
 src/xpiks-qt/build*
+src/xpiks-qt/BUILDNO
 *.pro.user
 *.autosave
 src/xpiks-tests/build-*
@@ -15,7 +19,11 @@ hunspell-1.6.0
 *.a
 .qmake.stash
 moc_*.cpp
+moc_*.h
 *.exe
 installer/packages/xpiks/data/
 *.qm
 UiTestsStubPlugin/
+debian/*.debhelper
+debian/*.debhelper.*
+debian/xpiks/*

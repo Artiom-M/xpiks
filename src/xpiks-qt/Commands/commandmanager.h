@@ -355,7 +355,7 @@ namespace Commands {
         SpellCheck::SpellCheckSuggestionModel *m_SpellCheckSuggestionModel;
         MetadataIO::MetadataIOService *m_MetadataIOService;
         //Connectivity::TelemetryService *m_TelemetryService;
-        Connectivity::UpdateService *m_UpdateService;
+        //Connectivity::UpdateService *m_UpdateService;
         Models::LogsModel *m_LogsModel;
         MetadataIO::MetadataIOCoordinator *m_MetadataIOCoordinator;
         Plugins::PluginManager *m_PluginManager;

@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+
+GITROOT=$(shell git rev-parse --show-toplevel)
+
+%:
+	dh $@
+
+#override_dh_auto_configure:
+#	dh_auto_configure
+#	$(shell pwd)/build_vendors_linux.sh release
+
+#override_dh_shlibdeps:
+#    dh_shlibdeps -l$(shell pwd)/lib/Linux/$(DEB_BUILD_GNU_CPU)
+#	dh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info -l$(GITROOT)/libs/release

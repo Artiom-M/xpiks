@@ -28,9 +28,11 @@ CONFIG(debug, debug|release)  {
     DEFINES += WITH_PLUGINS
     DEFINES += FAKE_WARNINGS
     #QMAKE_CXXFLAGS += -fsanitize=thread
+    DESTDIR = ../../libs/debug
 } else {
     message("Building release")
     DEFINES += WITH_LOGS
+    DESTDIR = ../../libs/release
 }
 
 INCLUDEPATH += ../xpiks-qt

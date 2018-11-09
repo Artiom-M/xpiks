@@ -22,14 +22,19 @@ Xpiks is a free and open source keywording and uploading tool for microstock pho
 - extensible with plugins
 - works under Linux, OS X and Windows
 
+This for is for Linux only. It contains changes and support files for creating a debian package for *Ubuntu 18*.
+For more recent code and other platforms see original project : https://github.com/ribtoks/xpiks/
+
 **How to build**
 
-Please see the [BUILD.md](https://github.com/ribtoks/xpiks/blob/master/BUILD.md) file
+Please see the [BUILD.md] file
 
 **How to install**
 
-Please see the [INSTALL.md](https://github.com/ribtoks/xpiks/blob/master/INSTALL.md) file
+Please see the [INSTALL.md] file
 
 **How to contribute**
 
 Please see the [CONTRIBUTING.md](https://github.com/ribtoks/xpiks/blob/master/CONTRIBUTING.md) file
+
+If you would like to create packages for other flavors of linux, I can integrated them into this repository as well.
