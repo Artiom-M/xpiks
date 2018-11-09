@@ -27,11 +27,11 @@ For more recent code and other platforms see original project : https://github.c
 
 **How to build**
 
-Please see the [BUILD.md] file
+Please see the [BUILD.md](BUILD.md) file
 
 **How to install**
 
-Please see the [INSTALL.md] file
+Please see the [INSTALL.md](INSTALL.md) file
 
 **How to contribute**
 

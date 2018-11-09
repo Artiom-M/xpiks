@@ -27,3 +27,4 @@ UiTestsStubPlugin/
 debian/*.debhelper
 debian/*.debhelper.*
 debian/xpiks/*
+debian/files
