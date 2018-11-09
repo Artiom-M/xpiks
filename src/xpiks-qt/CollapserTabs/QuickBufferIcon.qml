@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -16,21 +16,19 @@ import "../StyledControls"
 import "../Dialogs"
 import "../Common.js" as Common
 import "../Constants/UIConfig.js" as UIConfig
-import xpiks 1.0
 
-Rectangle {
-    width: 24
-    height: 20
-    border.color: isHighlighted ? uiColors.labelActiveForeground : uiColors.inactiveControlColor
-    border.width: 2
-    color: "transparent"
+Image {
+    id: iconWrapper
+    anchors.centerIn: parent
+    source: isHighlighted ? highlightedIcon : normalIcon
 
-    Rectangle {
-        width: 24
-        height: 15
-        border.color: isHighlighted ? uiColors.labelActiveForeground : uiColors.inactiveControlColor
-        border.width: 2
-        color: "transparent"
-        anchors.bottom: parent.bottom
-    }
+    property string normalIcon: uiColors.t + helpersWrapper.getAssetForTheme("Clipboard_icon_normal.svg", settingsModel.selectedThemeIndex)
+    property string highlightedIcon: uiColors.t + helpersWrapper.getAssetForTheme("Clipboard_icon_selected.svg", settingsModel.selectedThemeIndex)
+
+    width: 27
+    height: 27
+    fillMode: Image.PreserveAspectFit
+    sourceSize.width: 27
+    sourceSize.height: 27
+    cache: true
 }

@@ -20,3 +20,4 @@ If you want to create Xpiks executable for everyday usage, before each `Run qmak
 
 This guide was written based on *Ubuntu 18*. In other versions or debain derivatives packages can have slightly different names.
 
+For other platforms very detailed build instructions moved [to the Wiki](https://github.com/ribtoks/xpiks/wiki/Build-instructions)

@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -28,11 +28,11 @@ Item {
     property bool emptyPasswords: false
     property bool skipUploadItems: false
     property variant componentParent
-    property bool uploadEnabled: (artworkRepository.artworksSourcesCount > 0) && (filteredArtItemsModel.selectedArtworksCount > 0)
-    property var ftpListAC: helpersWrapper.getFtpACList()
-    property var artworkUploader: helpersWrapper.getArtworkUploader()
-    property var uploadWatcher: artworkUploader.getUploadWatcher()
-    property var uploadInfos: helpersWrapper.getUploadInfos();
+    property bool uploadEnabled: (artworksRepository.artworksSourcesCount > 0) && (filteredArtworksListModel.selectedArtworksCount > 0)
+    property var artworksUploader: dispatcher.getCommandTarget(UICommand.SetupUpload)
+    property var uploadWatcher: artworksUploader.getUploadWatcherObject()
+    property var uploadInfos: artworksUploader.getUploadInfosObject();
+    property var ftpListAC: uploadInfos.getStocksCompletionObject()
 
     signal dialogDestruction();
     Component.onDestruction: dialogDestruction();
@@ -42,7 +42,7 @@ Item {
     }
 
     Connections {
-        target: helpersWrapper
+        target: xpiksApp
         onGlobalBeforeDestruction: {
             console.debug("UI:UploadArtworks # globalBeforeDestruction")
             closePopup()
@@ -53,25 +53,25 @@ Item {
         secretsManager.purgeMasterPassword()
         warningsModel.resetShowSelected()
         uploadInfos.finalizeAccounts()
-        settingsModel.saveUploadHosts()
         uploadArtworksComponent.destroy()
         uploadWatcher.resetModel()
     }
 
-    function mainAction() {
-        artworkUploader.resetProgress()
-        artworkUploader.uploadArtworks()
+    function doStartUpload() {
+        artworksUploader.resetProgress()
+        uploadWatcher.resetModel()
+        artworksUploader.uploadArtworks()
     }
 
     function startUpload() {
-        if (artworkUploader.needCreateArchives()) {
+        if (artworksUploader.needCreateArchives()) {
             var callbackObject = {
                 afterZipped: function() {
-                    mainAction();
+                    doStartUpload();
                 }
             }
 
-            filteredArtItemsModel.setSelectedForZipping()
+            dispatcher.dispatch(UICommand.SetupCreatingArchives, {})
             Common.launchDialog("Dialogs/ZipArtworksDialog.qml",
                                 uploadArtworksComponent.componentParent,
                                 {
@@ -79,7 +79,7 @@ Item {
                                     callbackObject: callbackObject
                                 });
         } else {
-            mainAction();
+            doStartUpload();
         }
     }
 
@@ -109,14 +109,6 @@ Item {
         standardButtons: StandardButton.Yes | StandardButton.No
         onYes: {
             uploadInfos.removeItem(itemIndex)
-            if (uploadInfos.infosCount == 0) {
-                if (typeof titleText !== "undefined") {
-                    titleText.text = ""
-                    ftpHost.text = ""
-                    ftpUsername.text = ""
-                    ftpPassword.text = ""
-                }
-            }
         }
     }
 
@@ -139,7 +131,7 @@ Item {
         onYes: {
             console.log("UI:UploadArtworks # About to cancel upload...")
             uploadButton.enabled = false
-            artworkUploader.cancelOperation()
+            artworksUploader.cancelOperation()
         }
     }
 
@@ -184,7 +176,7 @@ Item {
             anchors.bottomMargin: -glowRadius/2
             glowRadius: 4
             spread: 0.0
-            color: uiColors.defaultControlColor
+            color: uiColors.popupGlowColor
             cornerRadius: glowRadius
         }
 
@@ -204,10 +196,11 @@ Item {
                 anchors.top: parent.top
                 anchors.bottom: progress.top
                 width: 250
-                enabled: !artworkUploader.inProgress
+                enabled: !artworksUploader.inProgress
 
                 ListView {
                     id: uploadHostsListView
+                    objectName: "uploadHostsListView"
                     model: uploadInfos
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -217,14 +210,6 @@ Item {
                     anchors.bottomMargin: 10
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
-
-                    add: Transition {
-                        NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 230 }
-                    }
-
-                    remove: Transition {
-                        NumberAnimation { property: "opacity"; to: 0; duration: 230 }
-                    }
 
                     displaced: Transition {
                         NumberAnimation { properties: "x,y"; duration: 230 }
@@ -238,8 +223,11 @@ Item {
                         NumberAnimation { properties: "x,y"; duration: 230 }
                     }
 
+                    onCurrentIndexChanged: { uploadInfos.setCurrentIndex(uploadHostsListView.currentIndex) }
+
                     delegate: Rectangle {
                         id: sourceWrapper
+                        objectName: "sourceWrapper"
                         property variant myData: model
                         property int delegateIndex: index
                         property bool isCurrent: ListView.isCurrentItem
@@ -285,6 +273,7 @@ Item {
 
                             StyledCheckbox {
                                 id: itemCheckedCheckbox
+                                objectName: "itemCheckedCheckbox"
                                 isContrast: !sourceWrapper.isCurrent
                                 onClicked: editisselected = checked
                                 Component.onCompleted: itemCheckedCheckbox.checked = isselected
@@ -303,7 +292,7 @@ Item {
                             StyledText {
                                 id: percentText
                                 text: percent + '%'
-                                visible: artworkUploader.inProgress && isselected
+                                visible: artworksUploader.inProgress && isselected
                                 color: uiColors.artworkActiveColor
                                 font.bold: true
                             }
@@ -353,6 +342,7 @@ Item {
 
                     StyledBlackButton {
                         id: addExportPlanButton
+                        objectName: "addExportPlanButton"
                         text: i18.n + qsTr("Add new", "upload host")
                         width: 210
                         height: 30
@@ -367,40 +357,12 @@ Item {
             }
 
             Item {
-                id: rightHeader
-                anchors.left: leftPanel.right
-                anchors.right: parent.right
-                anchors.top: parent.top
-                height: 40
-
-                StyledText {
-                    anchors.right: parent.right
-                    anchors.rightMargin: 20
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: i18.n + getOriginalText()
-                    isActive: false
-
-                    function getOriginalText() {
-                        return artworkUploader.itemsCount === 1 ? qsTr("1 artwork selected") : qsTr("%1 artworks selected").arg(artworkUploader.itemsCount)
-                    }
-
-                    Connections {
-                        target: artworkUploader
-                        onItemsCountChanged: {
-                            textItemsAvailable.originalText = artworkUploader.itemsCount === 1 ? qsTr("1 artwork selected") : qsTr("%1 artworks selected").arg(artworkUploader.itemsCount)
-                            textItemsAvailable.text = i18.n + originalText
-                        }
-                    }
-                }
-            }
-
-            Item {
                 id: rightPanel
                 anchors.left: leftPanel.right
                 anchors.right: parent.right
-                anchors.top: rightHeader.top
+                anchors.top: parent.top
                 anchors.bottom: progress.top
-                enabled: !artworkUploader.inProgress && (uploadHostsListView.count > 0)
+                enabled: !artworksUploader.inProgress && (uploadHostsListView.count > 0)
 
                 MouseArea {
                     id: rightPanelMA
@@ -464,6 +426,7 @@ Item {
 
                     Rectangle {
                         id: generalTab
+                        objectName: "generalTab"
                         color: uiColors.selectedArtworkBackground
                         anchors.fill: parent
                         property var autoCompleteBox
@@ -480,6 +443,11 @@ Item {
                         function showStockCompletion(textField) {
                             ftpListAC.selectedIndex = -1
 
+                            if (ftpListAC.getCount() === 0) {
+                                ftpListAC.cancelCompletion()
+                                return;
+                            }
+
                             if (typeof generalTab.autoCompleteBox !== "undefined") {
                                 // update completion
                                 return
@@ -490,7 +458,7 @@ Item {
                             var isBelow = true
 
                             var options = {
-                                model: ftpListAC.getCompletionsModel(),
+                                model: ftpListAC.getCompletionsModelObject(),
                                 autoCompleteSource: ftpListAC,
                                 isBelowEdit: isBelow,
                                 "anchors.left": directParent.left,
@@ -506,7 +474,6 @@ Item {
                                 var instance = component.createObject(directParent, options);
 
                                 instance.boxDestruction.connect(generalTab.onAutoCompleteClose)
-                                instance.itemSelected.connect(textField.acceptCompletion)
                                 generalTab.autoCompleteBox = instance
 
                                 ftpListAC.isActive = true
@@ -537,6 +504,7 @@ Item {
 
                                 StyledTextInput {
                                     id: titleText
+                                    objectName: "titleTextInput"
                                     height: parent.height
                                     anchors.left: parent.left
                                     anchors.right: parent.right
@@ -563,14 +531,6 @@ Item {
                                     onActiveFocusChanged: {
                                         if (!activeFocus) {
                                             ftpListAC.cancelCompletion()
-                                        }
-                                    }
-
-                                    function acceptCompletion(completionID) {
-                                        if (uploadHostsListView.currentItem) {
-                                            var completion = ftpListAC.getCompletion(completionID);
-                                            uploadHostsListView.currentItem.myData.edittitle = completion
-                                            uploadHostsListView.currentItem.myData.edithost = artworkUploader.getFtpAddress(completion)
                                         }
                                     }
 
@@ -611,10 +571,11 @@ Item {
                                         if ((Qt.Key_A <= event.key && event.key <= Qt.Key_Z) ||
                                                 (Qt.Key_0 <= event.key && event.key <= Qt.Key_9) ||
                                                 (text.length === 0 && !ftpListAC.isActive)) {
-                                            generalTab.showStockCompletion(titleText)
                                             ftpListAC.searchTerm = text
+                                            generalTab.showStockCompletion(titleText)
                                         } else if (event.key === Qt.Key_Backspace) {
                                             ftpListAC.searchTerm = text
+                                            generalTab.showStockCompletion(titleText)
                                         }
                                     }
                                 }
@@ -638,6 +599,7 @@ Item {
 
                                 StyledTextInput {
                                     id: ftpHost
+                                    objectName: "ftpAddressInput"
                                     height: parent.height
                                     anchors.left: parent.left
                                     anchors.leftMargin: 5
@@ -715,6 +677,7 @@ Item {
                                     anchors.leftMargin: 5
                                     anchors.right: parent.right
                                     anchors.rightMargin: 5
+                                    horizontalAlignment: TextInput.AlignLeft
                                     echoMode: showPasswordCheckBox.checked ? TextInput.Normal : TextInput.Password
                                     text: uploadHostsListView.currentItem ? uploadHostsListView.currentItem.myData.password : ""
                                     onTextChanged: {
@@ -741,6 +704,22 @@ Item {
                                     id: showPasswordCheckBox
                                     text: i18.n + qsTr("Show password")
                                     checked: false
+
+                                    onCheckedChanged: {
+                                        if (checked) {
+                                            passwordTimer.start()
+                                        }
+                                    }
+                                }
+
+                                Timer {
+                                    id: passwordTimer
+                                    repeat: false
+                                    triggeredOnStart: false
+                                    interval: 5000
+                                    onTriggered: {
+                                        showPasswordCheckBox.checked = false
+                                    }
                                 }
 
                                 Item {
@@ -770,11 +749,11 @@ Item {
                                         credentialsStatus.startAnimation()
                                         var disablePassiveMode = uploadHostsListView.currentItem.myData.disablepassivemode
                                         var disableEPSV = uploadHostsListView.currentItem.myData.disableEPSV
-                                        artworkUploader.checkCredentials(ftpHost.text, ftpUsername.text, ftpPassword.text, disablePassiveMode, disableEPSV)
+                                        artworksUploader.checkCredentials(ftpHost.text, ftpUsername.text, ftpPassword.text, disablePassiveMode, disableEPSV)
                                     }
 
                                     Connections {
-                                        target: artworkUploader
+                                        target: artworksUploader
                                         onCredentialsChecked: {
                                             var currHost = ftpHost.text
                                             if (url.indexOf(currHost) > -1) {
@@ -863,11 +842,29 @@ Item {
                                 }
                             }
 
+                            StyledCheckbox {
+                                id: vectorsFirstCheckBox
+                                text: i18.n + qsTr("Upload vectors before previews")
+                                Component.onCompleted: checked = uploadHostsListView.currentItem ? uploadHostsListView.currentItem.myData.vectorfirst : false
+
+                                onClicked: {
+                                    if (uploadHostsListView.currentItem) {
+                                        uploadHostsListView.currentItem.myData.editvectorfirst = checked
+                                    }
+                                }
+
+                                Connections {
+                                    target: uploadInfos
+                                    onDataChanged: {
+                                        vectorsFirstCheckBox.checked = uploadHostsListView.currentItem ? uploadHostsListView.currentItem.myData.vectorfirst : false
+                                    }
+                                }
+                            }
+
                             Item {
                                 Layout.fillHeight: true
                             }
                         }
-
                     }
                 }
 
@@ -876,7 +873,7 @@ Item {
                     anchors.fill: parent
                     color: uiColors.selectedArtworkBackground
                     opacity: 0.6
-                    visible: (uploadInfos.infosCount === 0) || artworkUploader.inProgress
+                    visible: (uploadInfos.infosCount === 0) || artworksUploader.inProgress
                 }
             }
 
@@ -887,8 +884,8 @@ Item {
                 anchors.bottom: footer.top
                 height: 5
                 isRounded: false
-                color: artworkUploader.isError ? uiColors.destructiveColor : uiColors.artworkActiveColor
-                value: artworkUploader.percent
+                color: artworksUploader.isError ? uiColors.destructiveColor : uiColors.artworkActiveColor
+                value: artworksUploader.percent
             }
 
             Rectangle {
@@ -913,7 +910,7 @@ Item {
                         text: i18.n + getOriginalText()
                         anchors.verticalCenter: parent.verticalCenter
                         enabled: uploadArtworksComponent.uploadEnabled && !skipUploadItems
-                        visible: !skipUploadItems && (!artworkUploader.inProgress) && (uploadWatcher.failedImagesCount === 0)
+                        visible: !skipUploadItems && (!artworksUploader.inProgress) && (uploadWatcher.failedImagesCount === 0)
 
                         function getOriginalText() {
                             return warningsModel.warningsCount == 1 ? qsTr("1 warning") : qsTr("%1 warnings").arg(warningsModel.warningsCount)
@@ -933,6 +930,7 @@ Item {
 
                     StyledLink {
                         id: failedArtworksStatus
+                        objectName: "failedArtworksStatus"
                         visible: !skipUploadItems && (uploadWatcher.failedImagesCount > 0)
                         enabled: uploadArtworksComponent.uploadEnabled && !skipUploadItems && (uploadWatcher.failedImagesCount > 0)
                         text: i18.n + getOriginalText()
@@ -958,12 +956,13 @@ Item {
 
                     StyledButton {
                         id: uploadButton
+                        objectName: "uploadButton"
                         enabled: uploadArtworksComponent.uploadEnabled && !skipUploadItems
-                        text: i18.n + (artworkUploader.inProgress ? qsTr("Stop") : qsTr("Start Upload"))
+                        text: i18.n + (artworksUploader.inProgress ? qsTr("Stop") : qsTr("Start Upload"))
                         width: 130
                         anchors.verticalCenter: parent.verticalCenter
                         onClicked: {
-                            if (!artworkUploader.inProgress) {
+                            if (!artworksUploader.inProgress) {
                                 if (uploadInfos.getSelectedInfosCount() === 0) {
                                     selectHostsMessageBox.open()
                                 } else {
@@ -981,12 +980,12 @@ Item {
                         }
 
                         Connections {
-                            target: artworkUploader
+                            target: artworksUploader
                             onStartedProcessing: {
                                 helpersWrapper.turnTaskbarProgressOn()
                             }
                             onPercentChanged: {
-                                helpersWrapper.setTaskbarProgress(artworkUploader.percent)
+                                helpersWrapper.setTaskbarProgress(artworksUploader.percent)
                             }
                             onFinishedProcessing: {
                                 uploadButton.enabled = true
@@ -1001,9 +1000,8 @@ Item {
                     StyledButton {
                         text: i18.n + qsTr("Close")
                         width: 120
-                        enabled: !artworkUploader.inProgress
+                        enabled: !artworksUploader.inProgress
                         onClicked: {
-                            filteredArtItemsModel.updateSelectedArtworks()
                             closePopup()
                         }
                     }

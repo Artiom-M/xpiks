@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,13 +9,19 @@
  */
 
 #include "simplecurldownloader.h"
+
+#include <cstdio>
+#include <string>
+
 #include <QFile>
 #include <QTemporaryFile>
-#include <cstdio>
+#include <QtDebug>
+#include <QtGlobal>
+
 #include <curl/curl.h>
-#include "../Common/defines.h"
-#include "../Models/proxysettings.h"
-#include "ftphelpers.h"
+
+#include "Common/logging.h"
+#include "Connectivity/ftphelpers.h"
 
 static size_t write_file(void *buffer, size_t size, size_t nmemb, void *param) {
     QFile *out = (QFile *)param;

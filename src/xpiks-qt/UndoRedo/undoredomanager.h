@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,54 +11,59 @@
 #ifndef UNDOREDOMANAGER_H
 #define UNDOREDOMANAGER_H
 
-#include <QObject>
-#include <stack>
 #include <memory>
+#include <stack>
+#include <vector>
+
 #include <QMutex>
-#include "../Commands/commandmanager.h"
-#include "../Common/baseentity.h"
-#include "iundoredomanager.h"
+#include <QObject>
+#include <QString>
+
+#include "Commands/Base/icommand.h"
+#include "Common/messages.h"
+#include "Common/types.h"
+#include "UndoRedo/iundoredomanager.h"
 
 namespace UndoRedo {
-    class HistoryItem;
-
     class UndoRedoManager:
             public QObject,
-            public Common::BaseEntity,
-            public IUndoRedoManager
+            public IUndoRedoManager,
+            public Common::MessagesTarget<Common::NamedType<int, Common::MessageType::UnavailableFiles>>
     {
         Q_OBJECT
         Q_PROPERTY(bool canUndo READ getCanUndo NOTIFY canUndoChanged)
         Q_PROPERTY(QString undoDescription READ getUndoDescription NOTIFY undoDescriptionChanged)
     public:
-        UndoRedoManager(QObject *parent=0):
-            QObject(parent),
-            Common::BaseEntity()
-        {}
-
-        virtual ~UndoRedoManager();
+        UndoRedoManager(QObject *parent=nullptr):
+            QObject(parent)
+        { }
 
     public:
         bool getCanUndo() const { return !m_HistoryStack.empty(); }
+
+    public:
+        virtual void handleMessage(Common::NamedType<int, Common::MessageType::UnavailableFiles> const &message) override;
 
     signals:
         void canUndoChanged();
         void undoDescriptionChanged();
         void itemRecorded();
         void undoStackEmpty();
-        void actionUndone(int commandID);
 
     private:
         QString getUndoDescription() const { return m_HistoryStack.empty() ? "" : m_HistoryStack.top()->getDescription(); }
 
     public:
-        virtual void recordHistoryItem(std::unique_ptr<UndoRedo::IHistoryItem> &historyItem) override;
+        virtual void recordHistoryItem(const std::shared_ptr<Commands::ICommand> &historyItem) override;
         Q_INVOKABLE bool undoLastAction();
         Q_INVOKABLE void discardLastAction();
 
     private:
+        std::shared_ptr<Commands::ICommand> popLastItem(bool &emptyNow);
+
+    private:
         // stack for future todos
-        std::stack<std::unique_ptr<IHistoryItem> > m_HistoryStack;
+        std::stack<std::shared_ptr<Commands::ICommand>> m_HistoryStack;
         QMutex m_Mutex;
     };
 }

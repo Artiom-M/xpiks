@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,10 +11,10 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
-#include <QStringList>
-#include <QString>
-#include <QWaitCondition>
 #include <QMutex>
+#include <QString>
+#include <QStringList>
+#include <QWaitCondition>
 
 namespace Helpers {
     class Logger
@@ -32,19 +32,27 @@ namespace Helpers {
             m_LogFilepath = filepath;
         }
 
+        void setMemoryOnly(bool value) {
+            m_MemoryOnly = value;
+        }
+
         QString getLogFilePath() const { return m_LogFilepath; }
 
         void log(const QString &message);
         void flush();
+        void emergencyLog(const char * const message);
+        void emergencyFlush();
         void stop();
 
-#ifdef INTEGRATION_TESTS
+#if defined(INTEGRATION_TESTS) || defined(UI_TESTS)
     public:
-        void emergencyFlush();
+        void abortFlush();
 #endif
 
     private:
         void doLog(const QString &message);
+        QString prepareLine(const QString &lineToWrite);
+        void flushAll();
         void flushStream(QStringList *logItems);
 
     private:
@@ -52,6 +60,7 @@ namespace Helpers {
             m_QueueLogTo = &m_LogsStorage[0];
             m_QueueFlushFrom = &m_LogsStorage[1];
             m_Stopped = false;
+            m_MemoryOnly = false;
         }
 
         Logger(Logger const&);
@@ -66,6 +75,7 @@ namespace Helpers {
         QMutex m_FlushMutex;
         QWaitCondition m_AnyLogsToFlush;
         volatile bool m_Stopped;
+        volatile bool m_MemoryOnly;
     };
 }
 

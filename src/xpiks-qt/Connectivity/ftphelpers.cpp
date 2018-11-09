@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,14 +9,24 @@
  */
 
 #include "ftphelpers.h"
-#include "uploadcontext.h"
+
 #include <cstdio>
-#include <cstdlib>
 #include <sstream>
 #include <string>
+
+#include <QByteArray>
+#include <QChar>
+#include <QLatin1String>
+#include <QtDebug>
+#include <QtGlobal>
+
 #include <curl/curl.h>
-#include "../Models/proxysettings.h"
-#include "../Helpers/stringhelper.h"
+
+#include <vendors/libxpks/uploadcontext.h>
+
+#include "Common/logging.h"
+#include "Helpers/stringhelper.h"
+#include "Models/Connectivity/proxysettings.h"
 
 namespace Connectivity {
     /* The MinGW headers are missing a few Win32 function definitions,
@@ -133,7 +143,6 @@ namespace Connectivity {
           LOG_INFO << sanitizeCurlLogline(Helpers::string_format("== Info: %s", data));
       default: /* in case a new one is introduced to shock us */
           return 0;
-
       case CURLINFO_HEADER_OUT:
           text = "=> Send header";
           break;
@@ -208,7 +217,7 @@ namespace Connectivity {
         return host;
     }
 
-    void fillProxySettings(void *curlHandle, Models::ProxySettings *proxySettings) {
+    void fillProxySettings(void *curlHandle, const Models::ProxySettings *proxySettings) {
         if (proxySettings == nullptr) { return; }
 
         curl_easy_setopt(curlHandle, CURLOPT_PROXY, proxySettings->m_Address.toLocal8Bit().data());

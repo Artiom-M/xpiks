@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -13,6 +13,7 @@ import QtQuick.Dialogs 1.1
 import QtQuick.Controls 1.1
 import QtQuick.Layouts 1.1
 import QtGraphicalEffects 1.0
+import xpiks 1.0
 import "../Constants"
 import "../Common.js" as Common
 import "../Components"
@@ -22,6 +23,7 @@ import "../Constants/UIConfig.js" as UIConfig
 Item {
     id: replaceSetupComponent
     property var filteredModel
+    property var replaceModel: dispatcher.getCommandTarget(UICommand.FindAndReplaceInSelected)
     anchors.fill: parent
 
     function closePopup() {
@@ -30,7 +32,6 @@ Item {
     }
 
     Keys.onEscapePressed: closePopup()
-
 
     signal dialogDestruction();
     Component.onDestruction: dialogDestruction();
@@ -113,7 +114,7 @@ Item {
             anchors.bottomMargin: -glowRadius / 2
             glowRadius: 4
             spread: 0.0
-            color: uiColors.defaultControlColor
+            color: uiColors.popupGlowColor
             cornerRadius: glowRadius
         }
 

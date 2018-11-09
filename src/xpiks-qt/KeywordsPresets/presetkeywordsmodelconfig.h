@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,17 +11,23 @@
 #ifndef PRESETSKEYWORDSMODELCONFIG_H
 #define PRESETSKEYWORDSMODELCONFIG_H
 
+#include <memory>
 #include <vector>
-#include "../Helpers/localconfig.h"
-#include "presetgroupsmodel.h"
 
-#define DEFAULT_GROUP_ID -1
+#include <QJsonDocument>
+#include <QString>
+#include <QStringList>
 
-namespace Helpers {
-    class AsyncCoordinator;
+#include "Helpers/localconfig.h"
+
+class QJsonArray;
+
+namespace Common {
+    class ISystemEnvironment;
 }
 
 namespace KeywordsPresets {
+    struct GroupModel;
     struct PresetData {
         QStringList m_Keywords;
         QString m_Name;
@@ -40,9 +46,10 @@ namespace KeywordsPresets {
     friend class PresetKeywordsModel;
 
     public:
-        PresetKeywordsModelConfig();
+        PresetKeywordsModelConfig(Common::ISystemEnvironment &environment);
         void initializeConfigs();
-        void loadFromModel(const std::vector<PresetModel *> &presets, const std::vector<GroupModel> &presetGroups);
+        void loadFromModel(const std::vector<std::shared_ptr<PresetModel> > &presets,
+                           const std::vector<GroupModel> &presetGroups);
         void sync();
 
     private:
@@ -64,6 +71,7 @@ namespace KeywordsPresets {
         void writeToConfig();
 
     private:
+        Common::ISystemEnvironment &m_Environment;
         Helpers::LocalConfig m_Config;
         QString m_LocalConfigPath;
         std::vector<PresetData> m_PresetData;

@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,24 +11,39 @@
 #ifndef REQUESTSWORKER_H
 #define REQUESTSWORKER_H
 
+#include <memory>
+
 #include <QObject>
-#include "connectivityrequest.h"
-#include "../Common/itemprocessingworker.h"
+#include <QString>
+
+#include "Common/itemprocessingworker.h"
+
+namespace Models {
+    class ProxySettings;
+}
 
 namespace Connectivity {
-    class RequestsWorker: public QObject, public Common::ItemProcessingWorker<ConnectivityRequest>
+    class IConnectivityRequest;
+
+    class RequestsWorker: public QObject, public Common::ItemProcessingWorker<IConnectivityRequest>
     {
         Q_OBJECT
     public:
-        explicit RequestsWorker(QObject *parent = 0);
+        explicit RequestsWorker(const Models::ProxySettings &proxySettings, QObject *parent = 0);
+
+    public:
+        void sendRequestSync(std::shared_ptr<IConnectivityRequest> &item);
 
     protected:
         virtual bool initWorker() override;
-        virtual void processOneItem(std::shared_ptr<ConnectivityRequest> &item) override;
+        virtual void processOneItem(std::shared_ptr<IConnectivityRequest> &item) override { sendRequest(item); }
+
+    private:
+        void sendRequest(std::shared_ptr<IConnectivityRequest> &item);
 
     protected:
         virtual void onQueueIsEmpty() override { emit queueIsEmpty(); }
-        virtual void workerStopped() override { emit stopped(); }
+        virtual void onWorkerStopped() override { emit stopped(); }
 
     public slots:
         void process() { doWork(); }
@@ -37,6 +52,9 @@ namespace Connectivity {
     signals:
         void stopped();
         void queueIsEmpty();
+
+    private:
+        const Models::ProxySettings &m_ProxySettings;
     };
 }
 

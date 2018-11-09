@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,12 +9,24 @@
  */
 
 #include "csvexportplansmodel.h"
-#include <QDir>
-#include <QThread>
+
+#include <algorithm>
+
 #include <QJsonArray>
 #include <QJsonDocument>
-#include "../Helpers/asynccoordinator.h"
-#include "../Connectivity/apimanager.h"
+#include <QJsonValue>
+#include <QJsonValueRef>
+#include <QLatin1String>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Common/isystemenvironment.h"
+#include "Common/logging.h"
+#include "Connectivity/apimanager.h"
+#include "Helpers/asynccoordinator.h"
+#include "Helpers/localconfig.h"
+#include "MetadataIO/csvexportproperties.h"
+#include "Models/Connectivity/abstractconfigupdatermodel.h"
 
 #define PLAN_NAME_KEY QLatin1String("name")
 #define PLAN_IS_SYSTEM_KEY QLatin1String("issystem")
@@ -23,17 +35,7 @@
 #define PROPERTY_TYPE_KEY QLatin1String("propertyType")
 #define PROPERTY_NAME_KEY QLatin1String("propertyName")
 #define COLUMN_NAME_KEY QLatin1String("columnName")
-
-#ifdef QT_DEBUG
-    #ifdef INTEGRATION_TESTS
-        #define EXPORT_PLANS_FILE "integration_csv_export_plans.json"
-    #else
-        #define EXPORT_PLANS_FILE "debug_csv_export_plans.json"
-    #endif
-#else
 #define EXPORT_PLANS_FILE "csv_export_plans.json"
-#endif
-
 #define OVERWRITE_KEY "overwrite"
 #define OVERWRITE_CSV_PLANS false
 
@@ -129,7 +131,7 @@ namespace MetadataIO {
                 continue;
             }
 
-            exportPlan.reset(new CsvExportPlan());
+            exportPlan = std::make_shared<CsvExportPlan>();
 
             exportPlan->m_Name = nameValue.toString();
 
@@ -174,33 +176,27 @@ namespace MetadataIO {
         return result;
     }
 
-    CsvExportPlansModel::CsvExportPlansModel(QObject *parent):
-        Models::AbstractConfigUpdaterModel(OVERWRITE_CSV_PLANS, parent)
+    CsvExportPlansModel::CsvExportPlansModel(Common::ISystemEnvironment &environment,
+                                             QObject *parent):
+        Models::AbstractConfigUpdaterModel(
+            environment.path({EXPORT_PLANS_FILE}),
+            Connectivity::ApiManager::getInstance().getCsvExportPlansAddr(),
+            OVERWRITE_CSV_PLANS,
+            environment.getIsInMemoryOnly(),
+            parent),
+        m_Environment(environment)
     {
     }
 
-    void CsvExportPlansModel::initializeConfigs(Helpers::AsyncCoordinator *initCoordinator) {
+    void CsvExportPlansModel::initializeConfigs(Helpers::AsyncCoordinator &initCoordinator,
+                                                Connectivity::IRequestsService &requestsService) {
         LOG_DEBUG << "#";
 
         Helpers::AsyncCoordinatorLocker locker(initCoordinator);
         Helpers::AsyncCoordinatorUnlocker unlocker(initCoordinator);
         Q_UNUSED(locker); Q_UNUSED(unlocker);
 
-        QString localConfigPath;
-
-        QString appDataPath = XPIKS_USERDATA_PATH;
-        if (!appDataPath.isEmpty()) {
-            QDir appDataDir(appDataPath);
-            localConfigPath = appDataDir.filePath(EXPORT_PLANS_FILE);
-        } else {
-            localConfigPath = EXPORT_PLANS_FILE;
-        }
-
-        auto &apiManager = Connectivity::ApiManager::getInstance();
-        QString remoteAddress = apiManager.getCsvExportPlansAddr();
-        AbstractConfigUpdaterModel::initializeConfigs(remoteAddress, localConfigPath);
-
-        emit plansUpdated();
+        AbstractConfigUpdaterModel::initializeConfigs(requestsService);
     }
 
     void CsvExportPlansModel::sync(const std::vector<std::shared_ptr<CsvExportPlan> > &exportPlans) {
@@ -212,12 +208,7 @@ namespace MetadataIO {
         doc.setObject(plansObject);
 
         Helpers::LocalConfig &localConfig = getLocalConfig();
-
-        Helpers::LocalConfigDropper dropper(&localConfig);
-        Q_UNUSED(dropper);
-
-        localConfig.setConfig(doc);
-        localConfig.saveToFile();
+        localConfig.writeConfig(doc);
     }
 
     bool CsvExportPlansModel::processLocalConfig(const QJsonDocument &document) {
@@ -226,6 +217,7 @@ namespace MetadataIO {
         if (document.isObject()) {
             QJsonObject exportPlansObject = document.object();
             deserializeExportPlans(exportPlansObject);
+            emit plansUpdated();
         } else {
             LOG_WARNING << "JSON document doesn't contain an object";
         }

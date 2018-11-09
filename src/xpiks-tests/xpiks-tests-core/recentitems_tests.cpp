@@ -1,7 +1,10 @@
 #include "recentitems_tests.h"
-#include "../../xpiks-qt/Models/recentitemsmodel.h"
-#include "../../xpiks-qt/Models/recentdirectoriesmodel.h"
-#include "../../xpiks-qt/Models/recentfilesmodel.h"
+
+#include "Models/Session/recentdirectoriesmodel.h"
+#include "Models/Session/recentfilesmodel.h"
+#include "Models/Session/recentitemsmodel.h"
+
+#include "Mocks/coretestsenvironment.h"
 
 void checkCannotPushMoreThan(Models::RecentItemsModel &recentItems) {
     int maxRecent = recentItems.getMaxRecentItems();
@@ -14,13 +17,17 @@ void checkCannotPushMoreThan(Models::RecentItemsModel &recentItems) {
 }
 
 void RecentItemsTests::pushMoreThanXFilesTest() {
-    Models::RecentFilesModel recentFiles;
+    Mocks::CoreTestsEnvironment environment;
+    Models::RecentFilesModel recentFiles(environment);
+    recentFiles.initialize();
 
     checkCannotPushMoreThan(recentFiles);
 }
 
 void RecentItemsTests::pushMoreThanXDirectoriesTest() {
-    Models::RecentDirectoriesModel recentDirectories;
+    Mocks::CoreTestsEnvironment environment;
+    Models::RecentDirectoriesModel recentDirectories(environment);
+    recentDirectories.initialize();
 
     checkCannotPushMoreThan(recentDirectories);
 }
@@ -38,13 +45,17 @@ void checkLastPushedIsMostRecent(Models::RecentItemsModel &recentItems) {
 }
 
 void RecentItemsTests::lastPushedIsMostRecentFileTest() {
-    Models::RecentFilesModel recentFiles;
+    Mocks::CoreTestsEnvironment environment;
+    Models::RecentFilesModel recentFiles(environment);
+    recentFiles.initialize();
 
     checkLastPushedIsMostRecent(recentFiles);
 }
 
 void RecentItemsTests::lastPushedIsMostRecentDirectoryTest() {
-    Models::RecentDirectoriesModel recentDirectories;
+    Mocks::CoreTestsEnvironment environment;
+    Models::RecentDirectoriesModel recentDirectories(environment);
+    recentDirectories.initialize();
 
     checkLastPushedIsMostRecent(recentDirectories);
 }

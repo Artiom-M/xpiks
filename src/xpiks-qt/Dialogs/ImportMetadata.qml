@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -25,6 +25,7 @@ Item {
 
     property int importID: 0
     property bool backupsEnabled: true
+    property bool reimport: false
 
     signal dialogDestruction();
     Component.onDestruction: dialogDestruction();
@@ -43,15 +44,20 @@ Item {
 
     Connections {
         target: metadataIOCoordinator
-        onMetadataReadingFinished: {
+
+        onImportFinished: {
             console.log("UI::ImportMetadata # Import finished handler")
 
-            warningsModel.update()
+            if (importID == metadataImportComponent.importID) {
+                warningsModel.update()
 
-            if (metadataIOCoordinator.hasErrors) {
-                errorsNotification.open()
+                if (metadataIOCoordinator.hasErrors) {
+                    errorsNotification.open()
+                } else {
+                    closePopup()
+                }
             } else {
-                closePopup()
+                console.warn("Import ID " + importID + " doesn't match to " + metadataImportComponent.importID)
             }
         }
     }
@@ -68,7 +74,7 @@ Item {
     MessageDialog {
         id: errorsNotification
         title: i18.n + qsTr("Warning")
-        text: i18.n + qsTr("Import finished with errors. See logs for details.")
+        text: i18.n + qsTr("Action finished with errors. See logs for details.")
 
         onAccepted: {
             closePopup()
@@ -91,11 +97,6 @@ Item {
 
     function continueImport() {
         importButton.text = i18.n + qsTr("Importing...")
-
-        spinner.height = spinner.width
-        dialogWindow.height += spinner.height + column.spacing
-        spinner.running = true
-
         metadataIOCoordinator.continueReading(ignoreAutosavesCheckbox.checked)
     }
 
@@ -148,7 +149,7 @@ Item {
             anchors.bottomMargin: -glowRadius/2
             glowRadius: 4
             spread: 0.0
-            color: uiColors.defaultControlColor
+            color: uiColors.popupGlowColor
             cornerRadius: glowRadius
         }
 
@@ -206,7 +207,18 @@ Item {
                     width: 150
                     height: 0
                     anchors.horizontalCenter: parent.horizontalCenter
-                    running: false
+                    running: metadataIOCoordinator.isInProgress
+
+                    states: [
+                        State {
+                            name: "importing"
+                            when: metadataIOCoordinator.isInProgress
+                            PropertyChanges {
+                                target: spinner
+                                height: spinner.width
+                            }
+                        }
+                    ]
                 }
 
                 StyledCheckbox {
@@ -247,7 +259,7 @@ Item {
                         enabled: !metadataIOCoordinator.isInProgress
                         onClicked: {
                             console.debug("Close without Import pressed")
-                            metadataIOCoordinator.continueWithoutReading()
+                            metadataIOCoordinator.continueWithoutReading(ignoreAutosavesCheckbox.checked, metadataImportComponent.reimport)
                             closePopup()
                         }
                     }

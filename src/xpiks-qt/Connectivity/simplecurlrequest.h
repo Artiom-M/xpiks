@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,9 +11,9 @@
 #ifndef SimpleCurlRequest_H
 #define SimpleCurlRequest_H
 
+#include <QByteArray>
 #include <QObject>
 #include <QString>
-#include <QByteArray>
 #include <QStringList>
 
 namespace Models {
@@ -34,8 +34,8 @@ namespace Connectivity {
     public:
         void dispose() { emit stopped(); }
         bool sendRequestSync();
-        void setRawHeaders(const QStringList &headers);
-        void setProxySettings(Models::ProxySettings *proxySettings);
+        void addRawHeaders(const QStringList &headers);
+        void setProxySettings(const Models::ProxySettings *proxySettings);
 
     public slots:
         void process();
@@ -52,7 +52,7 @@ namespace Connectivity {
         QStringList m_RawHeaders;
         QByteArray m_ResponseData;
         QString m_ErrorString;
-        Models::ProxySettings *m_ProxySettings;
+        const Models::ProxySettings *m_ProxySettings;
         bool m_VerifySSL;
     };
 }

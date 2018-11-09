@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -14,6 +14,7 @@ import QtQuick.Layouts 1.1
 import QtQuick.Dialogs 1.1
 import QtQuick.Controls.Styles 1.1
 import QtGraphicalEffects 1.0
+import xpiks 1.0
 import "../Constants"
 import "../Common.js" as Common;
 import "../Components"
@@ -24,7 +25,7 @@ Item {
     property bool immediateProcessing: false
     property var callbackObject
     anchors.fill: parent
-    property var zipArchiver: helpersWrapper.getZipArchiver();
+    property var zipArchiver: dispatcher.getCommandTarget(UICommand.SetupCreatingArchives)
 
     signal dialogDestruction();
     Component.onDestruction: dialogDestruction();
@@ -38,6 +39,22 @@ Item {
         target: zipArchiver
         onRequestCloseWindow: {
             closePopup();
+        }
+
+        onFinishedProcessing: {
+            importButton.text = i18.n + qsTr("Start Zipping")
+
+            if (immediateProcessing) {
+                if (typeof callbackObject !== "undefined") {
+                    callbackObject.afterZipped()
+                }
+
+                closePopup()
+            }
+
+            //if (!zipArchiver.isError) {
+            //    closePopup()
+            //}
         }
     }
 
@@ -96,7 +113,7 @@ Item {
             anchors.bottomMargin: -glowRadius/2
             glowRadius: 4
             spread: 0.0
-            color: uiColors.defaultControlColor
+            color: uiColors.popupGlowColor
             cornerRadius: glowRadius
         }
 
@@ -130,7 +147,7 @@ Item {
                     }
 
                     StyledText {
-                        id:textItemsAvailable
+                        id: textItemsAvailable
                         text: i18.n + getOriginalText()
 
                         function getOriginalText() {
@@ -140,8 +157,7 @@ Item {
                         Connections {
                             target: zipArchiver
                             onItemsCountChanged: {
-                               textItemsAvailable.originalText = zipArchiver.itemsCount == 1 ? qsTr("1 artwork with vector") : qsTr("%1 artworks with vectors").arg(zipArchiver.itemsCount)
-                               textItemsAvailable.text = i18.n + originalText
+                                textItemsAvailable.text = i18.n + textItemsAvailable.getOriginalText()
                             }
                        }
                     }
@@ -168,6 +184,7 @@ Item {
 
                     StyledButton {
                         id: importButton
+                        objectName: "importButton"
                         isDefault: true
                         width: 130
                         text: i18.n + qsTr("Start Zipping")
@@ -175,25 +192,6 @@ Item {
                         onClicked: {
                             text = i18.n + qsTr("Zipping...")
                             zipArchiver.archiveArtworks()
-                        }
-
-                        Connections {
-                            target: zipArchiver
-                            onFinishedProcessing: {
-                                importButton.text = i18.n + qsTr("Start Zipping")
-
-                                if (immediateProcessing) {
-                                    if (typeof callbackObject !== "undefined") {
-                                        callbackObject.afterZipped()
-                                    }
-
-                                    closePopup()
-                                }
-
-                                //if (!zipArchiver.isError) {
-                                //    closePopup()
-                                //}
-                            }
                         }
                     }
 

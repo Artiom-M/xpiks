@@ -6,8 +6,8 @@
 class SpellCheckUndoTest : public IntegrationTestBase
 {
 public:
-    SpellCheckUndoTest(Commands::CommandManager *commandManager):
-        IntegrationTestBase(commandManager)
+    SpellCheckUndoTest(IntegrationTestsEnvironment &environment, XpiksTestsApp &testsApp):
+        IntegrationTestBase(environment, testsApp)
     {}
 
     // IntegrationTestBase interface

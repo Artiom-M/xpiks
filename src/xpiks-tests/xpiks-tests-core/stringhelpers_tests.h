@@ -1,7 +1,9 @@
 #ifndef STRINGHELPERSTESTS_H
 #define STRINGHELPERSTESTS_H
 
-#include <QtTest/QTest>
+#include <QObject>
+#include <QtTest>  // IWYU pragma: keep
+// IWYU pragma: no_include <QString>
 
 class StringHelpersTests : public QObject
 {
@@ -25,6 +27,7 @@ private slots:
     void replaceWholeNoCaseHitTest();
     void replaceWholeNoHitTest();
     void switcherHashTest();
+    void basicUrlDecodeTest();
 };
 
 #endif // STRINGHELPERSTESTS_H

@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,8 +11,12 @@
 #ifndef REQUESTSSERVICE_H
 #define REQUESTSSERVICE_H
 
+#include <memory>
+
 #include <QObject>
-#include "../Common/baseentity.h"
+#include <QString>
+
+#include "Connectivity/irequestsservice.h"
 
 namespace Helpers {
     class RemoteConfig;
@@ -23,33 +27,34 @@ namespace Models {
 }
 
 namespace Connectivity {
+    class IConnectivityRequest;
     class RequestsWorker;
 
-    class RequestsService : public QObject, public Common::BaseEntity
+    class RequestsService : public QObject, public IRequestsService
     {
         Q_OBJECT
     public:
-        explicit RequestsService(QObject *parent = 0);
+        explicit RequestsService(const Models::ProxySettings &proxySettings, QObject *parent = 0);
 
     public:
         void startService();
         void stopService();
 
     public:
-        void receiveConfig(const QString &url, Helpers::RemoteConfig *config);
-
-    private:
-        Models::ProxySettings *getProxySettings() const;
+        virtual void receiveConfig(Helpers::RemoteConfig &config) override;
+        void sendRequest(const std::shared_ptr<IConnectivityRequest> &request);
+        void sendRequestSync(std::shared_ptr<IConnectivityRequest> &request);
 
     signals:
         void cancelServing();
 
     private slots:
         void workerFinished();
+        void workerDestroyed(QObject *object);
 
     private:
         RequestsWorker *m_RequestsWorker;
-        bool m_IsStopped;
+        const Models::ProxySettings &m_ProxySettings;
     };
 }
 

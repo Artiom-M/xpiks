@@ -2,7 +2,8 @@
 #define QUICKBUFFERTESTS_H
 
 #include <QObject>
-#include <QtTest/QtTest>
+#include <QtTest>  // IWYU pragma: keep
+// IWYU pragma: no_include <QString>
 
 class QuickBufferTests: public QObject
 {
@@ -15,6 +16,8 @@ private slots:
     void copyHalfEmptyArtworkToQuickBufferTest();
     void copyHalfEmptyProxyModelToQuickBufferTest();
     void copyHalfEmptyCombinedModelToQuickBufferTest();
+
+    void copyKeywordsSuggestorToQuickBufferTest();
 
     void applyQuickBufferToArtworkTest();
     void applyQuickBufferToProxyModelTest();

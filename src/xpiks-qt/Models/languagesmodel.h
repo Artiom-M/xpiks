@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -12,21 +12,30 @@
 #define LANGUAGESMODEL_H
 
 #include <QAbstractListModel>
-#include <QVector>
-#include <QString>
-#include <QPair>
 #include <QDir>
-#include "../Common/baseentity.h"
+#include <QHash>
+#include <QModelIndex>
+#include <QObject>
+#include <QPair>
+#include <QString>
+#include <QVariant>
+#include <QVector>
+#include <Qt>
+#include <QtGlobal>
 
+class QByteArray;
+class QModelIndex;
 class QTranslator;
 
 namespace Models {
-    class LanguagesModel: public QAbstractListModel, public Common::BaseEntity
+    class SettingsModel;
+
+    class LanguagesModel: public QAbstractListModel
     {
         Q_OBJECT
         Q_PROPERTY(QString n READ getEmptyString() NOTIFY languageChanged)
     public:
-        LanguagesModel(QObject *parent=0);
+        LanguagesModel(Models::SettingsModel &settingsModel, QObject *parent=0);
 
     public:
         enum LanguagesModel_Roles {
@@ -59,6 +68,7 @@ namespace Models {
         QVector<QPair<QString, QString> > m_LanguagesList;
         QTranslator *m_XpiksTranslator;
         QTranslator *m_QtTranslator;
+        SettingsModel &m_SettingsModel;
         QString m_EmptyString;
         QString m_TranslationsPath;
         int m_CurrentLanguageIndex;

@@ -1,5 +1,5 @@
 # version format
-version: 1.4.{build}-{branch}
+version: 1.5.{build}
 
 os: Visual Studio 2015
 
@@ -7,15 +7,15 @@ platform:
   - x64
 
 environment:
-  QTDIR: C:\Qt\5.6\msvc2015_64
+  QTDIR: C:\Qt\5.9\msvc2015_64
   matrix:
     - XPIKS_BINARY: true
     - CORE_TESTS: true
-      QT_FATAL_WARNINGS: true
+      QT_FATAL_WARNINGS: 1
     - INTEGRATION_TESTS: true
-      QT_FATAL_WARNINGS: true
+      QT_FATAL_WARNINGS: 1
     - UI_TESTS: true
-      QT_FATAL_WARNINGS: true
+      QT_FATAL_WARNINGS: 0
 
 branches:
   # blacklist
@@ -39,8 +39,12 @@ clone_folder: c:\projects\xpiks
 # set clone depth
 clone_depth: 3                      # clone entire repository history if not defined
 
+# appveyor cannot process cache correctly
+#cache:
+#  - vendors -> appveyor.yml
+
 matrix:
-  fast_finish: true
+  fast_finish: false
   allow_failures:
     - configuration: release
 
@@ -49,70 +53,28 @@ init:
 
 install:
   - if %QTDIR:_64=%==%QTDIR% ( set ARCH=x86 ) else set ARCH=x64
-  - git clone --depth=2 https://bitbucket.org/ribtoks/xpiks-deps.git c:\projects\xpiks-deps
-  - cmd: 'cd c:\projects\xpiks-deps'
-  - cmd: 'cd c:\projects\xpiks'
-  - git submodule update --init --recursive
   - cmd: set PATH=%PATH%;%QTDIR%\bin
   - qmake -v
 
 before_build:
-  - cmd: 'echo %cd%'
-  - cmd: 'xcopy /s c:\projects\xpiks-deps\windows-libs\%configuration%-x64 c:\projects\xpiks\libs'
-  - cmd: 'xcopy /s c:\projects\xpiks-deps\windows-libs\ffmpeg-x64\%configuration% c:\projects\xpiks\libs'
-  - cmd: 'move c:\projects\xpiks-deps\hunspell-1.6.0 c:\projects\xpiks\vendors'
-  - cmd: 'move c:\projects\xpiks-deps\zlib-1.2.11 c:\projects\xpiks\vendors'
-  - cmd: 'cd c:\projects\xpiks'
-  - cmd: 'ren vendors\tiny-aes\aes.c aes.cpp'
-  - cmd: 'copy libs\mman.* vendors\cpp-libface\libs'
+#  - cmd: 'xcopy /s c:\projects\xpiks-deps\windows-libs\%configuration%-x64 c:\projects\xpiks\libs\%configuration%'
   - cmd: 'call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" %ARCH%'
+  - git fetch origin gh-pages
+  - git checkout FETCH_HEAD -- api
 
 build_script:
-  - cmd: 'echo %cd%'
-  - if not defined UI_TESTS vendors\build_vendors_appveyor.bat
-  - cmd: 'cd src'
-  - if defined XPIKS_BINARY cd xpiks-qt
-  - if defined XPIKS_BINARY qmake "CONFIG+=%configuration% appveyor" xpiks-qt.pro
-  - if defined CORE_TESTS cd xpiks-tests\xpiks-tests-core
-  - if defined CORE_TESTS qmake "CONFIG+=%configuration% appveyor" xpiks-tests-core.pro
-  - if defined INTEGRATION_TESTS cd xpiks-tests\xpiks-tests-integration
-  - if defined INTEGRATION_TESTS qmake "CONFIG+=%configuration% appveyor" xpiks-tests-integration.pro
-  - if defined UI_TESTS cd xpiks-tests\ui-tests-stubs
-  - if defined UI_TESTS qmake "CONFIG+=%configuration% appveyor" ui-tests-stubs.pro
-  - if defined UI_TESTS nmake.exe
-  - if defined UI_TESTS cd ..\xpiks-tests-ui
-  - if defined UI_TESTS qmake "CONFIG+=%configuration% appveyor" xpiks-tests-ui.pro
-  - nmake.exe
-
-after_build:
-  - cmd: 'echo %cd%'
-  - if defined XPIKS_BINARY cd %configuration%
-  - if defined XPIKS_BINARY windeployqt.exe --debug --qmldir=../../xpiks-qt/CollapserTabs/ --qmldir=../../xpiks-qt/Components/ --qmldir=../../xpiks-qt/Constants/ --qmldir=../../xpiks-qt/Dialogs/ --qmldir=../../xpiks-qt/StackViews/ --qmldir=../../xpiks-qt/StyledControls/ --qmldir=../../xpiks-qt/ xpiks-qt.exe
-  - if defined XPIKS_BINARY xcopy /Y /s c:\projects\xpiks\src\xpiks-qt\deps .
-  - if defined XPIKS_BINARY copy /Y ..\..\..\libs\libcurl*.dll .
-  - if defined XPIKS_BINARY copy /Y ..\..\..\libs\quazip*.dll .
-  - if defined XPIKS_BINARY copy /Y ..\..\..\libs\ssdll.dll .
-  - if defined XPIKS_BINARY copy /Y ..\..\..\libs\mman.dll .
-  - if defined XPIKS_BINARY copy /Y ..\..\..\libs\face.dll .
-  - if defined XPIKS_BINARY copy /Y ..\..\..\libs\z.dll .
-  - if defined XPIKS_BINARY del *.obj
-  - if defined XPIKS_BINARY del *.cpp
-  - if defined XPIKS_BINARY cd ..
-  - if defined XPIKS_BINARY 7z a xpiks-qt-%configuration%.zip %configuration%
-  - if defined XPIKS_BINARY appveyor PushArtifact xpiks-qt-%configuration%.zip
-
-before_test:
-  - cmd: 'echo %cd%'
-  - if defined CORE_TESTS copy ..\..\..\libs\*.dll .
-  - if defined INTEGRATION_TESTS copy ..\..\..\libs\*.dll .
-
+  - scripts\build\checkout_deps_windows.bat
+  - scripts\build\build_vendors_windows.bat appveyor
+  - if defined XPIKS_BINARY scripts\ci\appveyor-xpiks.bat
+  - if defined CORE_TESTS scripts\ci\appveyor-core-tests.bat build
+  - if defined INTEGRATION_TESTS scripts\ci\appveyor-integration-tests.bat build
+  - if defined UI_TESTS scripts\ci\appveyor-ui-tests.bat build
+  
 test_script:
-  - cmd: 'echo %cd%'
-  - if defined CORE_TESTS %configuration%\xpiks-tests-core.exe
-  - if defined INTEGRATION_TESTS %configuration%\xpiks-tests-integration.exe
-  - if defined UI_TESTS %configuration%\xpiks-tests-ui.exe
+  - if defined CORE_TESTS scripts\ci\appveyor-core-tests.bat run
+  - if defined INTEGRATION_TESTS scripts\ci\appveyor-integration-tests.bat run
+  - if defined UI_TESTS scripts\ci\appveyor-ui-tests.bat run
 
 on_failure:
+  - ps: Get-EventLog AppVeyor -newest 10 | Format-List
   - ps: Get-ChildItem .\*.dmp | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name }
-  - if defined INTEGRATION_TESTS appveyor PushArtifact %configuration%\xpiks-tests-integration.exe
-  - if defined INTEGRATION_TESTS appveyor PushArtifact %configuration%\xpiks-tests-integration.pdb

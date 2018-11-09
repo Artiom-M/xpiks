@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,11 +11,12 @@
 #ifndef CACHEDIMAGE_H
 #define CACHEDIMAGE_H
 
-#include <QString>
-#include <QHash>
-#include <QSize>
 #include <QDateTime>
-#include <QDataStream>
+#include <QSize>
+#include <QString>
+#include <QtGlobal>
+
+class QDataStream;
 
 namespace QMLExtensions {
     struct CachedImage {

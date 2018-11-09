@@ -6,8 +6,8 @@
 class SaveFileBasicTest : public IntegrationTestBase
 {
 public:
-    SaveFileBasicTest(Commands::CommandManager *commandManager):
-        IntegrationTestBase(commandManager)
+    SaveFileBasicTest(IntegrationTestsEnvironment &environment, XpiksTestsApp &testsApp):
+        IntegrationTestBase(environment, testsApp)
     {}
 
     // IntegrationTestBase interface

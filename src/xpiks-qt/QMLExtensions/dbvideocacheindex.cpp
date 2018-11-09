@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,36 +9,40 @@
  */
 
 #include "dbvideocacheindex.h"
-#include "../Helpers/database.h"
-#include "../Helpers/constants.h"
+
+#include <memory>
+
+#include <QtDebug>
+
+#include "Common/logging.h"
+#include "Helpers/constants.h"
+#include "QMLExtensions/cachedvideo.h"
+#include "QMLExtensions/dbcacheindex.h"
+#include "Storage/idatabase.h"
+#include "Storage/idatabasemanager.h"
+#include "Storage/memorytable.h"
 
 namespace QMLExtensions {
-    DbVideoCacheIndex::DbVideoCacheIndex(Helpers::DatabaseManager *dbManager):
+    DbVideoCacheIndex::DbVideoCacheIndex(Storage::IDatabaseManager &dbManager):
         DbCacheIndex(dbManager)
     {
     }
 
     bool DbVideoCacheIndex::initialize() {
         LOG_DEBUG << "#";
-        Q_ASSERT(m_DatabaseManager != nullptr);
 
         bool success = false;
         do {
-            m_Database = m_DatabaseManager->openDatabase(Constants::VIDEOCACHE_DB_NAME);
+            m_Database = m_DatabaseManager.openDatabase(Constants::VIDEOCACHE_DB_NAME);
             if (!m_Database) {
                 LOG_WARNING << "Failed to open database";
-                break;
+            } else {
+                m_DbCacheIndex = m_Database->getTable(Constants::VIDEO_CACHE_TABLE);
             }
 
-            if (!m_Database->initialize()) {
-                LOG_WARNING << "Failed to initialize images cache";
-                break;
-            }
-
-            m_DbCacheIndex = m_Database->getTable(Constants::VIDEO_CACHE_TABLE);
             if (!m_DbCacheIndex) {
                 LOG_WARNING << "Failed to get table" << Constants::VIDEO_CACHE_TABLE;
-                break;
+                m_DbCacheIndex = std::make_shared<Storage::MemoryTable>(Constants::VIDEO_CACHE_TABLE);
             }
 
             success = true;

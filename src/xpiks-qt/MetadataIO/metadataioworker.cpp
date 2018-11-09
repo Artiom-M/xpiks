@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,19 +9,33 @@
  */
 
 #include "metadataioworker.h"
-#include "../QMLExtensions/artworksupdatehub.h"
-#include "../Suggestion/locallibraryquery.h"
+
+#include <vector>
+
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Artworks/artworkmetadata.h"
+#include "Common/itemprocessingworker.h"
+#include "Common/logging.h"
+#include "Common/readerwriterqueue.h"
+#include "MetadataIO/metadatacache.h"
+#include "MetadataIO/metadataiotask.h"
+#include "Services/artworksupdatehub.h"
+#include "Suggestion/locallibraryquery.h"
 
 #define METADATA_CACHE_SYNC_INTERVAL 29
+#define STORAGE_IMPORT_INTERVAL 29
 
 namespace MetadataIO {
-    MetadataIOWorker::MetadataIOWorker(Helpers::DatabaseManager *dbManager, QMLExtensions::ArtworksUpdateHub *artworksUpdateHub, QObject *parent):
+    MetadataIOWorker::MetadataIOWorker(Storage::IDatabaseManager &dbManager,
+                                       Services::ArtworksUpdateHub &artworksUpdateHub,
+                                       QObject *parent):
         QObject(parent),
-        m_MetadataCache(dbManager),
         m_ArtworksUpdateHub(artworksUpdateHub),
+        m_MetadataCache(dbManager),
         m_ProcessedItemsCount(0)
     {
-        Q_ASSERT(artworksUpdateHub != nullptr);
     }
 
     bool MetadataIOWorker::initWorker() {
@@ -34,17 +48,23 @@ namespace MetadataIO {
         return true;
     }
 
+    std::shared_ptr<void> MetadataIOWorker::processWorkItem(WorkItem &workItem) {
+        if (workItem.isSeparator()) {
+            LOG_DEBUG << "Processing separator";
+            m_MetadataCache.sync();
+            emit readyToImportFromStorage();
+        } else {
+            processOneItem(workItem.m_Item);
+        }
+
+        return std::shared_ptr<void>();
+    }
+
     void MetadataIOWorker::processOneItem(std::shared_ptr<MetadataIOTaskBase> &item) {
         do {
             std::shared_ptr<MetadataReadWriteTask> readWriteItem = std::dynamic_pointer_cast<MetadataReadWriteTask>(item);
             if (readWriteItem) {
                 processReadWriteItem(readWriteItem);
-                break;
-            }
-
-            std::shared_ptr<MetadataCacheSyncTask> syncTask = std::dynamic_pointer_cast<MetadataCacheSyncTask>(item);
-            if (syncTask) {
-                m_MetadataCache.sync();
                 break;
             }
 
@@ -60,25 +80,31 @@ namespace MetadataIO {
     }
 
     void MetadataIOWorker::processReadWriteItem(std::shared_ptr<MetadataReadWriteTask> &item) {
-        Models::ArtworkMetadata *artworkMetadata = item->getArtworkMetadata();
-        Q_ASSERT(artworkMetadata != nullptr);
-        if (artworkMetadata == nullptr) { return; }
+        auto &artwork = item->getArtworkMetadata();
+        Q_ASSERT(artwork != nullptr);
+        if (artwork == nullptr) { return; }
 
         const MetadataReadWriteTask::ReadWriteAction action = item->getReadWriteAction();
         if (action == MetadataReadWriteTask::Read) {
-            if (m_MetadataCache.read(artworkMetadata)) {
-                m_ArtworksUpdateHub->updateArtwork(artworkMetadata);
+            auto readRequest = std::make_shared<StorageReadRequest>();
+            if (m_MetadataCache.read(artwork, readRequest->m_CachedArtwork)) {
+                readRequest->m_Artwork = artwork;
+                m_StorageReadQueue.push(readRequest);
             }
         } else if (action == MetadataReadWriteTask::Write) {
-            m_MetadataCache.save(artworkMetadata, true);
+            m_MetadataCache.save(artwork, true);
         } else if (action == MetadataReadWriteTask::Add) {
-            m_MetadataCache.save(artworkMetadata, false);
+            m_MetadataCache.save(artwork, false);
         }
 
         m_ProcessedItemsCount++;
 
         if (m_ProcessedItemsCount % METADATA_CACHE_SYNC_INTERVAL == 0) {
             m_MetadataCache.sync();
+        }
+
+        if (m_StorageReadQueue.size() > STORAGE_IMPORT_INTERVAL) {
+            emit readyToImportFromStorage();
         }
     }
 
@@ -88,7 +114,22 @@ namespace MetadataIO {
         localLibraryQuery->notifyResultsReady();
     }
 
-    void MetadataIOWorker::workerStopped() {
+    void MetadataIOWorker::importArtworksFromStorage() {
+        LOG_DEBUG << "#";
+        std::vector<std::shared_ptr<StorageReadRequest> > readRequests;
+        // popAll() returns queue in reversed order for performance reasons
+        m_StorageReadQueue.popAll(readRequests);
+        LOG_DEBUG << readRequests.size() << "requests to process";
+
+        for (auto &request: readRequests) {
+            bool modified = request->m_Artwork->initFromStorage(request->m_CachedArtwork);
+            Q_UNUSED(modified);
+
+            m_ArtworksUpdateHub.updateArtwork(request->m_Artwork);
+        }
+    }
+
+    void MetadataIOWorker::onWorkerStopped() {
         m_MetadataCache.finalize();
         emit stopped();
     }

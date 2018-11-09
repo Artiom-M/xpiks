@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,10 +11,13 @@
 #ifndef READERWRITERQUEUE_H
 #define READERWRITERQUEUE_H
 
-#include <QMutexLocker>
-#include <QMutex>
-#include <vector>
+#include <cstddef>
 #include <memory>
+#include <vector>
+
+#include <QtGlobal>
+#include <QMutex>
+#include <QMutexLocker>
 
 namespace Common {
     // queue optimized for "many writers - 1 reader" case
@@ -136,6 +139,18 @@ namespace Common {
 
                 m_ReadQueue.clear();
                 m_WriteQueue.clear();
+            }
+        }
+
+        size_t size() {
+            QMutexLocker readLocker(&m_ReadMutex);
+            Q_UNUSED(readLocker);
+            {
+                QMutexLocker writeLocker(&m_WriteMutex);
+                Q_UNUSED(writeLocker);
+
+                size_t size = m_ReadQueue.size() + m_WriteQueue.size();
+                return size;
             }
         }
 

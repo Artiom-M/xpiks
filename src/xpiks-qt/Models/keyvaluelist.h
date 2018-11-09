@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,15 +11,25 @@
 #ifndef KEYVALUELIST_H
 #define KEYVALUELIST_H
 
-#include <QAbstractListModel>
-#include <QHash>
-#include <vector>
 #include <memory>
 
-namespace Models {
+#include <QAbstractListModel>
+#include <QHash>
+#include <QObject>
+#include <QString>
+#include <QVariant>
+#include <Qt>
+
+class QByteArray;
+class QModelIndex;
+
+namespace Artworks {
     class ArtworkMetadata;
     class ImageArtwork;
     class VideoArtwork;
+}
+
+namespace Models {
 
     class KeyValueList: public QAbstractListModel
     {
@@ -51,16 +61,17 @@ namespace Models {
         ArtworkPropertiesMap(): m_IsImage(false) {}
 
     public:
-        void updateProperties(ArtworkMetadata *metadata);
+        void updateProperties(std::shared_ptr<Artworks::ArtworkMetadata> const &artwork);
 
     private:
-        void setForTheImage(ImageArtwork *imageArtwork);
-        void setForTheVideo(VideoArtwork *videoArtwork);
+        void setForTheImage(std::shared_ptr<Artworks::ImageArtwork> const &imageArtwork);
+        void setForTheVideo(std::shared_ptr<Artworks::VideoArtwork> const &videoArtwork);
 
     private:
         enum class ImageProperties {
             FilePathProperty,
             FileSizeProperty,
+            FileAccessProperty,
             ImageSizeProperty,
             DateTakenProperty,
             AttachedVectorProperty,
@@ -70,6 +81,7 @@ namespace Models {
         enum class VideoProperties {
             FilePathProperty,
             FileSizeProperty,
+            FileAccessProperty,
             CodecProperty,
             FrameSizeProperty,
             VideoDurationProperty,

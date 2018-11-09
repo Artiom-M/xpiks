@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,21 +9,32 @@
  */
 
 #include "imagecachingworker.h"
+
+#include <QByteArray>
+#include <QChar>
+#include <QCryptographicHash>
+#include <QDataStream>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
-#include <QImage>
-#include <QString>
 #include <QFileInfo>
-#include <QByteArray>
-#include <QDataStream>
-#include <QReadLocker>
-#include <QWriteLocker>
-#include <QCryptographicHash>
-#include "../Common/defines.h"
-#include "../Helpers/constants.h"
-#include "imagecacherequest.h"
-#include "../Helpers/asynccoordinator.h"
-#include "dbimagecacheindex.h"
+#include <QHash>
+#include <QIODevice>
+#include <QImage>
+#include <QSize>
+#include <QString>
+#include <QThread>
+#include <Qt>
+#include <QtDebug>
+
+#include "Common/isystemenvironment.h"
+#include "Common/itemprocessingworker.h"
+#include "Common/logging.h"
+#include "Helpers/asynccoordinator.h"
+#include "Helpers/constants.h"
+#include "QMLExtensions/cachedimage.h"
+#include "QMLExtensions/dbimagecacheindex.h"
+#include "QMLExtensions/imagecacherequest.h"
 
 #define IMAGE_CACHING_WORKER_SLEEP_DELAY 500
 #define IMAGES_INDEX_BACKUP_STEP 50
@@ -34,9 +45,13 @@ namespace QMLExtensions {
         return QString::fromLatin1(QCryptographicHash::hash(path.toUtf8(), QCryptographicHash::Sha256).toHex());
     }
 
-    ImageCachingWorker::ImageCachingWorker(Helpers::AsyncCoordinator *initCoordinator, Helpers::DatabaseManager *dbManager, QObject *parent):
+    ImageCachingWorker::ImageCachingWorker(Common::ISystemEnvironment &environment,
+                                           Helpers::AsyncCoordinator &initCoordinator,
+                                           Storage::IDatabaseManager &dbManager,
+                                           QObject *parent):
         QObject(parent),
         ItemProcessingWorker(2),
+        m_Environment(environment),
         m_InitCoordinator(initCoordinator),
         m_ProcessedItemsCount(0),
         m_Cache(dbManager),
@@ -51,20 +66,9 @@ namespace QMLExtensions {
         Q_UNUSED(unlocker);
 
         m_ProcessedItemsCount = 0;
-        QString appDataPath = XPIKS_USERDATA_PATH;
 
-        if (!appDataPath.isEmpty()) {
-            m_ImagesCacheDir = QDir::cleanPath(appDataPath + QDir::separator() + Constants::IMAGES_CACHE_DIR);
-
-            QDir imagesCacheDir(m_ImagesCacheDir);
-            if (!imagesCacheDir.exists()) {
-                LOG_INFO << "Creating cache dir" << m_ImagesCacheDir;
-                QDir().mkpath(m_ImagesCacheDir);
-            }
-        } else {
-            m_ImagesCacheDir = QDir::currentPath();
-        }
-
+        m_Environment.ensureDirExists(Constants::IMAGES_CACHE_DIR);
+        m_ImagesCacheDir = m_Environment.path({Constants::IMAGES_CACHE_DIR});
         LOG_INFO << "Using" << m_ImagesCacheDir << "for images cache";
 
         m_Cache.initialize();
@@ -72,19 +76,19 @@ namespace QMLExtensions {
         return true;
     }
 
-    void ImageCachingWorker::processOneItemEx(std::shared_ptr<ImageCacheRequest> &item, batch_id_t batchID, Common::flag_t flags) {
-        Q_UNUSED(batchID);
-
-        if (getIsSeparatorFlag(flags)) {
+    std::shared_ptr<void> ImageCachingWorker::processWorkItem(WorkItem &workItem) {
+        if (workItem.isSeparator()) {
             saveIndex();
         } else {
-            ItemProcessingWorker::processOneItemEx(item, batchID, flags);
+            processOneItem(workItem.m_Item);
 
-            if (getWithDelayFlag(flags)) {
+            if (workItem.isMilestone()) {
                 // force context switch for more imporant tasks
                 QThread::msleep(IMAGE_CACHING_WORKER_SLEEP_DELAY);
             }
         }
+
+        return std::shared_ptr<void>();
     }
 
     void ImageCachingWorker::processOneItem(std::shared_ptr<ImageCacheRequest> &item) {
@@ -106,8 +110,9 @@ namespace QMLExtensions {
 
         const bool isInResources = originalPath.startsWith(":/");
 
-        QImage img(originalPath);
-        if (img.isNull()) {
+        QImage img;
+        bool isLoaded = img.load(originalPath);
+        if (!isLoaded || img.isNull()) {
             LOG_WARNING << "Image" << originalPath << "is null image";
             return;
         }
@@ -117,7 +122,7 @@ namespace QMLExtensions {
         QFileInfo fi(originalPath);
         const QString suffix = isInResources ? "jpg" : fi.suffix();
         QString pathHash = getImagePathHash(originalPath) + "." + suffix;
-        QString cachedFilepath = QDir::cleanPath(m_ImagesCacheDir + QDir::separator() + pathHash);
+        QString cachedFilepath = QDir::cleanPath(m_ImagesCacheDir + QChar('/') + pathHash);
 
         if (resizedImage.save(cachedFilepath, nullptr, PREVIEW_JPG_QUALITY)) {
             CachedImage cachedImage;
@@ -137,7 +142,7 @@ namespace QMLExtensions {
         }
     }
 
-    void ImageCachingWorker::workerStopped() {
+    void ImageCachingWorker::onWorkerStopped() {
         LOG_DEBUG << "#";
         m_Cache.finalize();
         emit stopped();
@@ -149,7 +154,7 @@ namespace QMLExtensions {
         CachedImage cachedImage;
 
         if (m_Cache.tryGet(key, cachedImage)) {
-            QString cachedValue = QDir::cleanPath(m_ImagesCacheDir + QDir::separator() + cachedImage.m_Filename);
+            QString cachedValue = QDir::cleanPath(m_ImagesCacheDir + QChar('/') + cachedImage.m_Filename);
 
             QFileInfo fi(cachedValue);
 
@@ -167,23 +172,9 @@ namespace QMLExtensions {
         return found;
     }
 
-    QString getOldCacheFilepath() {
-        QString appDataPath = XPIKS_USERDATA_PATH;
-        QString indexFilepath;
-
-        if (!appDataPath.isEmpty()) {
-            QDir appDataDir(appDataPath);
-            indexFilepath = appDataDir.filePath(Constants::IMAGES_CACHE_INDEX);
-        } else {
-            indexFilepath = Constants::IMAGES_CACHE_INDEX;
-        }
-
-        return indexFilepath;
-    }
-
     bool ImageCachingWorker::upgradeCacheStorage() {
         bool migrated = false;
-        QString indexFilepath = getOldCacheFilepath();
+        QString indexFilepath = m_Environment.path({Constants::IMAGES_CACHE_INDEX});
         LOG_INFO << "Trying to load old cache index from" << indexFilepath;
 
         QHash<QString, CachedImage> oldCache;

@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,18 +9,35 @@
  */
 
 #include "presetkeywordsmodel.h"
-#include "../Commands/commandmanager.h"
-#include "../Helpers/stringhelper.h"
+
+#include <QAbstractItemModel>
+#include <QByteArray>
+#include <QChar>
+#include <QFlags>
+#include <QPair>
+#include <QQmlEngine>
+#include <QReadLocker>
+#include <QVector>
+#include <QWriteLocker>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Artworks/basickeywordsmodel.h"
+#include "Common/logging.h"
+#include "Helpers/stringhelper.h"
+#include "KeywordsPresets/groupmodel.h"
 
 #define MAX_SAVE_PAUSE_RESTARTS 5
 #define PRESET_SAVE_TIMEOUT 3000
 
 namespace KeywordsPresets {
-    PresetKeywordsModel::PresetKeywordsModel(QObject *parent):
+    PresetKeywordsModel::PresetKeywordsModel(Common::ISystemEnvironment &environment,
+                                             QObject *parent):
         QAbstractListModel(parent),
-        Common::BaseEntity(),
         Common::DelayedActionEntity(PRESET_SAVE_TIMEOUT, MAX_SAVE_PAUSE_RESTARTS),
-        m_GroupsModel(this),
+        m_Environment(environment),
+        m_PresetsConfig(environment),
+        m_GroupsModel(*this),
         m_LastUsedID(0)
     {
         m_SavingTimer.setSingleShot(true);
@@ -31,11 +48,8 @@ namespace KeywordsPresets {
     }
 
     PresetKeywordsModel::~PresetKeywordsModel() {
+        LOG_DEBUG << "#";
         removeAllPresets();
-
-        for (auto *x: m_Finalizers) {
-            delete x;
-        }
     }
 
     void PresetKeywordsModel::initializePresets() {
@@ -67,7 +81,7 @@ namespace KeywordsPresets {
         return result;
     }
 
-#if defined(CORE_TESTS) || defined(INTEGRATION_TESTS)
+#if defined(CORE_TESTS) || defined(INTEGRATION_TESTS) || defined(UI_TESTS)
     void PresetKeywordsModel::setName(int presetIndex, const QString &name) {
         if (presetIndex < 0 || presetIndex >= getPresetsCount()) {
             return;
@@ -75,6 +89,7 @@ namespace KeywordsPresets {
 
         m_PresetsList[presetIndex]->m_PresetName = name;
     }
+
     ID_t PresetKeywordsModel::addItem(const QString &presetName, const QStringList &keywords) {
         LOG_DEBUG << "#";
         int lastIndex = getPresetsCount();
@@ -82,19 +97,30 @@ namespace KeywordsPresets {
 
         beginInsertRows(QModelIndex(), lastIndex, lastIndex);
         {
-            m_PresetsList.push_back(new PresetModel(nextID, presetName, keywords, DEFAULT_GROUP_ID));
+            m_PresetsList.push_back(std::make_shared<PresetModel>(nextID, presetName, keywords, DEFAULT_GROUP_ID));
         }
         endInsertRows();
 
         return m_PresetsList.back()->m_ID;
     }
 
-    void PresetKeywordsModel::cleanup() {
-         beginResetModel();
-         {
-             removeAllPresets();
-         }
-         endResetModel();
+    void PresetKeywordsModel::clearModel() {
+        LOG_DEBUG << "#";
+        beginResetModel();
+        {
+            removeAllPresets();
+        }
+        endResetModel();
+    }
+
+    QString PresetKeywordsModel::getKeywordsString(int presetIndex) {
+        QReadLocker locker(&m_PresetsLock);
+        Q_UNUSED(locker);
+        if (presetIndex < m_PresetsList.size()) {
+            return m_PresetsList[presetIndex]->m_KeywordsModel.getKeywordsString();
+        } else {
+            return QString();
+        }
     }
 
     bool PresetKeywordsModel::removePresetByID(ID_t id) {
@@ -222,14 +248,14 @@ namespace KeywordsPresets {
         return result;
     }
 
-    void PresetKeywordsModel::foreachPreset(const std::function<bool (size_t, PresetModel *)> &action) {
+    void PresetKeywordsModel::foreachPreset(const std::function<bool (size_t, std::shared_ptr<PresetModel> const &)> &action) {
         QReadLocker locker(&m_PresetsLock);
         Q_UNUSED(locker);
 
         const size_t size = m_PresetsList.size();
 
         for (size_t i = 0; i < size; i++) {
-            PresetModel *preset = m_PresetsList[i];
+            auto &preset = m_PresetsList[i];
             const bool shouldContinue = action(i, preset);
             if (!shouldContinue) { break; }
         }
@@ -249,7 +275,7 @@ namespace KeywordsPresets {
 
     bool PresetKeywordsModel::tryGetPresetUnsafe(size_t presetIndex, QStringList &keywords) {
         Q_ASSERT(presetIndex < m_PresetsList.size());
-        auto *preset = m_PresetsList[presetIndex];
+        auto &preset = m_PresetsList[presetIndex];
         auto &keywordsModel = preset->m_KeywordsModel;
         keywords = keywordsModel.getKeywords();
         return true;
@@ -261,7 +287,7 @@ namespace KeywordsPresets {
         bool found = false;
 
         if (presetIndex < size) {
-            auto *preset = m_PresetsList[presetIndex];
+            auto &preset = m_PresetsList[presetIndex];
             if (preset->m_ID == id) {
                 found = true;
                 index = presetIndex;
@@ -270,7 +296,7 @@ namespace KeywordsPresets {
 
         if (!found) {
             for (size_t i = 0; i < size; i++) {
-                auto *preset = m_PresetsList[i];
+                auto &preset = m_PresetsList[i];
                 if (preset->m_ID == id) {
                     found = true;
                     index = i;
@@ -290,7 +316,7 @@ namespace KeywordsPresets {
 
         if (!strictMatch) {
             for (size_t i = 0; i < size; ++i) {
-                PresetModel *preset = m_PresetsList[i];
+                auto &preset = m_PresetsList[i];
 
                 if (QString::compare(name, preset->m_PresetName, Qt::CaseInsensitive) == 0) {
                     // full match always overrides
@@ -309,7 +335,7 @@ namespace KeywordsPresets {
             }
         } else {
             for (size_t i = 0; i < size; ++i) {
-                PresetModel *preset = m_PresetsList[i];
+                auto &preset = m_PresetsList[i];
                 if (preset->m_PresetName == name) {
                     if (foundIndex != -1) {
                         anyError = true;
@@ -337,7 +363,7 @@ namespace KeywordsPresets {
         size_t size = m_PresetsList.size();
 
         for (size_t i = 0; i < size; ++i) {
-            PresetModel *preset = m_PresetsList[i];
+            auto &preset = m_PresetsList[i];
 
             if (preset->m_PresetName.contains(name, Qt::CaseInsensitive)) {
                 results.push_back(qMakePair((int)i, preset->m_PresetName));
@@ -355,7 +381,7 @@ namespace KeywordsPresets {
 
             beginInsertRows(QModelIndex(), lastIndex, lastIndex);
             {
-                m_PresetsList.push_back(new PresetModel(nextID, name, keywords, -1));
+                m_PresetsList.emplace_back(std::make_shared<PresetModel>(nextID, name, keywords, -1));
             }
             endInsertRows();
 
@@ -375,15 +401,14 @@ namespace KeywordsPresets {
 
             beginInsertRows(QModelIndex(), lastIndex, lastIndex);
             {
-                m_PresetsList.push_back(new PresetModel(nextID, name, keywords, DEFAULT_GROUP_ID));
+                m_PresetsList.emplace_back(std::make_shared<PresetModel>(nextID, name, keywords, DEFAULT_GROUP_ID));
             }
             endInsertRows();
 
             index = lastIndex;
             isAdded = true;
         } else {
-            PresetModel *preset = m_PresetsList.at(existingIndex);
-            Q_ASSERT(preset != nullptr);
+            auto &preset = m_PresetsList.at(existingIndex);
             preset->m_KeywordsModel.setKeywords(keywords);
 
             QModelIndex indexToUpdate = this->index((int)existingIndex);
@@ -401,7 +426,7 @@ namespace KeywordsPresets {
         Qt::CaseSensitivity caseSensivity = caseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive;
 
         for (size_t i = 0; i < size; ++i) {
-            PresetModel *preset = m_PresetsList[i];
+            auto &preset = m_PresetsList[i];
 
             if (QString::compare(name, preset->m_PresetName, caseSensivity) == 0) {
                 // full match always overrides
@@ -439,6 +464,10 @@ namespace KeywordsPresets {
         return m_PresetsList[index]->m_ID;
     }
 
+    void PresetKeywordsModel::checkSpelling(const std::shared_ptr<PresetModel> &preset) {
+        sendMessage(std::dynamic_pointer_cast<Artworks::IBasicModelSource>(preset));
+    }
+
     void PresetKeywordsModel::removeItem(int row) {
         if (row < 0 || row >= getPresetsCount()){
             return;
@@ -461,7 +490,7 @@ namespace KeywordsPresets {
             Q_UNUSED(locker);
 
             lastIndex = getPresetsCount();
-            m_PresetsList.push_back(new PresetModel(nextID));
+            m_PresetsList.emplace_back(std::make_shared<PresetModel>(nextID));
         }
 
         beginInsertRows(QModelIndex(), lastIndex, lastIndex);
@@ -475,10 +504,12 @@ namespace KeywordsPresets {
         LOG_INFO << "item" << index << "keyword" << keywordIndex << "replacement" << replacement;
 
         if (0 <= index && index < getPresetsCount()) {
-            auto &keywordsModel = m_PresetsList.at(index)->m_KeywordsModel;
+            auto &preset = m_PresetsList.at(index);
+            auto &keywordsModel = preset->m_KeywordsModel;
             if (keywordsModel.editKeyword(keywordIndex, replacement)) {
-                m_CommandManager->submitKeywordForSpellCheck(&keywordsModel, keywordIndex);
                 justChanged();
+
+                checkSpelling(preset);
             }
         }
     }
@@ -488,13 +519,16 @@ namespace KeywordsPresets {
         QString keyword;
 
         if (0 <= index && index < getPresetsCount()) {
-            auto &keywordsModel = m_PresetsList.at(index)->m_KeywordsModel;
+            auto &preset = m_PresetsList.at(index);
+            auto &keywordsModel = preset->m_KeywordsModel;
             if (keywordsModel.removeKeywordAt(keywordIndex, keyword)) {
                 LOG_INFO << "Removed keyword:" << keyword;
                 justChanged();
 
                 QModelIndex indexToUpdate = this->index(index);
                 emit dataChanged(indexToUpdate, indexToUpdate, QVector<int>() << KeywordsCountRole);
+
+                checkSpelling(preset);
             }
         }
     }
@@ -504,29 +538,55 @@ namespace KeywordsPresets {
         QString keyword;
 
         if (0 <= index && index < getPresetsCount()) {
-            auto &keywordsModel = m_PresetsList.at(index)->m_KeywordsModel;
+            auto &preset = m_PresetsList.at(index);
+            auto &keywordsModel = preset->m_KeywordsModel;
             if (keywordsModel.removeLastKeyword(keyword)) {
                 LOG_INFO << "Removed keyword:" << keyword;
                 justChanged();
 
                 QModelIndex indexToUpdate = this->index(index);
                 emit dataChanged(indexToUpdate, indexToUpdate, QVector<int>() << KeywordsCountRole);
+
+                checkSpelling(preset);
             }
         }
+    }
+
+    bool PresetKeywordsModel::appendKeyword(int index, const QString &keyword) {
+        LOG_INFO << "index" << index << "keyword" << keyword;
+        bool added = false;
+
+        if (0 <= index && index < getPresetsCount()) {
+            auto &preset = m_PresetsList.at(index);
+            auto &keywordsModel = preset->m_KeywordsModel;
+            if (keywordsModel.appendKeyword(keyword)) {
+                added = true;
+
+                justChanged();
+
+                QModelIndex indexToUpdate = this->index(index);
+                emit dataChanged(indexToUpdate, indexToUpdate, QVector<int>() << KeywordsCountRole);
+
+                checkSpelling(preset);
+            }
+        }
+
+        return added;
     }
 
     void PresetKeywordsModel::pasteKeywords(int index, const QStringList &keywords) {
         LOG_INFO << "index" << index << "keywords:" << keywords;
 
         if (0 <= index && index < getPresetsCount()) {
-            auto *preset = m_PresetsList.at(index);
+            auto &preset = m_PresetsList.at(index);
             auto &keywordsModel = preset->m_KeywordsModel;
             keywordsModel.appendKeywords(keywords);
             justChanged();
-            m_CommandManager->submitItemForSpellCheck(&keywordsModel);
 
             QModelIndex indexToUpdate = this->index(index);
             emit dataChanged(indexToUpdate, indexToUpdate, QVector<int>() << KeywordsCountRole);
+
+            checkSpelling(preset);
         }
     }
 
@@ -534,41 +594,28 @@ namespace KeywordsPresets {
         LOG_INFO << "index" << index;
 
         if (0 <= index && index < getPresetsCount()) {
-            auto *preset = m_PresetsList.at(index);
-            Common::BasicKeywordsModel &keywordsModel = preset->m_KeywordsModel;
+            auto &preset = m_PresetsList.at(index);
+            Artworks::BasicKeywordsModel &keywordsModel = preset->m_KeywordsModel;
 
             QVector<QChar> separators;
             separators << QChar(',');
-            if (spaceIsSeparator) { separators << QChar(' '); }
+            if (spaceIsSeparator) { separators << QChar::Space; }
             QStringList keywords;
             Helpers::splitKeywords(rawKeywords.trimmed(), separators, keywords);
 
             keywordsModel.setKeywords(keywords);
             justChanged();
-            m_CommandManager->submitItemForSpellCheck(&keywordsModel);
 
             QModelIndex indexToUpdate = this->index(index);
             emit dataChanged(indexToUpdate, indexToUpdate, QVector<int>() << KeywordsCountRole);
+
+            checkSpelling(preset);
         }
     }
 
-    void PresetKeywordsModel::appendKeyword(int index, const QString &keyword) {
-        LOG_INFO << "index" << index << "keyword" << keyword;
-
-        if (0 <= index && index < getPresetsCount()) {
-            auto *preset = m_PresetsList.at(index);
-            auto &keywordsModel = preset->m_KeywordsModel;
-            keywordsModel.appendKeyword(keyword);
-            justChanged();
-            m_CommandManager->submitKeywordForSpellCheck(&keywordsModel, keywordsModel.getKeywordsCount() - 1);
-
-            QModelIndex indexToUpdate = this->index(index);
-            emit dataChanged(indexToUpdate, indexToUpdate, QVector<int>() << KeywordsCountRole);
-        }
-    }
-
-    QObject *PresetKeywordsModel::getKeywordsModel(int index) {
-        QObject *result = nullptr;
+    QObject *PresetKeywordsModel::getKeywordsModelObject(int index) {
+        LOG_FOR_TESTS << index;
+        Artworks::BasicKeywordsModel *result = nullptr;
 
         if (0 <= index && index < getPresetsCount()) {
             result = &m_PresetsList[index]->m_KeywordsModel;
@@ -586,6 +633,31 @@ namespace KeywordsPresets {
             m_PresetsConfig.loadFromModel(m_PresetsList, m_GroupsModel.getGroups());
         }
         m_PresetsConfig.sync();
+    }
+
+    void PresetKeywordsModel::makeTitleValid(int row) {
+        LOG_DEBUG << row;
+
+        QWriteLocker locker(&m_PresetsLock);
+        Q_UNUSED(locker);
+
+        const QString originalName = m_PresetsList[row]->m_PresetName;
+        QString currentName = originalName;
+        int attemptNumber = 0;
+
+        while (hasDuplicateNamesUnsafe(currentName, row)) {
+            LOG_DEBUG << "Preset" << currentName << "already exists";
+            attemptNumber++;
+            currentName = QString("%1 (%2)").arg(originalName).arg(attemptNumber);
+        }
+
+        if (currentName != originalName) {
+            m_PresetsList[row]->m_PresetName = currentName;
+            m_PresetsList[row]->setIsNameDuplicateFlag(false);
+            justChanged();
+            QModelIndex index = this->index(row);
+            emit dataChanged(index, index, QVector<int>() << NameRole << IsNameValidRole);
+        }
     }
 
     void PresetKeywordsModel::loadModelFromConfig() {
@@ -626,9 +698,10 @@ namespace KeywordsPresets {
 
             if (!tryFindPresetByFullNameUnsafe(name, false, index)) {
                 int nextID = generateNextID();
-                PresetModel *model = new PresetModel(nextID, name, keywords, item.m_GroupID);
-                m_PresetsList.push_back(model);
-                m_CommandManager->submitItemForSpellCheck(&model->m_KeywordsModel, Common::SpellCheckFlags::Keywords);
+                auto preset = std::make_shared<PresetModel>(nextID, name, keywords, item.m_GroupID);
+                m_PresetsList.push_back(preset);
+
+                checkSpelling(preset);
             } else {
                 LOG_WARNING << "Preset" << name << "already exists. Skipping...";
             }
@@ -639,13 +712,11 @@ namespace KeywordsPresets {
         QWriteLocker locker(&m_PresetsLock);
         Q_UNUSED(locker);
 
-        for (auto *p: m_PresetsList) {
-            if (p->release()) {
-                delete p;
-            } else {
-                m_Finalizers.push_back(p);
-            }
+#ifdef UI_TESTS
+        for (auto &preset: m_PresetsList) {
+            preset->m_KeywordsModel.clearKeywords();
         }
+#endif
 
         m_PresetsList.clear();
     }
@@ -653,6 +724,24 @@ namespace KeywordsPresets {
     int PresetKeywordsModel::generateNextID() {
         int lastID = m_LastUsedID.fetchAndAddOrdered(1);
         return lastID;
+    }
+
+    bool PresetKeywordsModel::hasDuplicateNamesUnsafe(const QString &presetName, size_t index) {
+        if (presetName.isEmpty()) { return false; }
+
+        bool anyDuplicate = false;
+
+        const size_t size = m_PresetsList.size();
+        for (size_t i = 0; i < size; i++) {
+            if (i == index) { continue; }
+
+            if (QString::compare(m_PresetsList[i]->m_PresetName, presetName, Qt::CaseInsensitive) == 0) {
+                anyDuplicate = true;
+                break;
+            }
+        }
+
+        return anyDuplicate;
     }
 
     int PresetKeywordsModel::rowCount(const QModelIndex &parent) const {
@@ -667,19 +756,21 @@ namespace KeywordsPresets {
             return QVariant();
         }
 
-        auto *item = m_PresetsList[row];
+        auto &preset = m_PresetsList[row];
 
         switch (role) {
         case NameRole:
-            return item->m_PresetName;
+            return preset->m_PresetName;
         case KeywordsCountRole:
-            return item->m_KeywordsModel.getKeywordsCount();
+            return preset->m_KeywordsModel.getKeywordsCount();
         case KeywordsStringRole:
-            return item->m_KeywordsModel.getKeywordsString();
+            return preset->m_KeywordsModel.getKeywordsString();
         case GroupRole:
-            return item->m_GroupID;
+            return preset->m_GroupID;
         case IdRole:
-            return item->m_ID;
+            return preset->m_ID;
+        case IsNameValidRole:
+            return !preset->getIsNameDuplicateFlag();
         default:
             return QVariant();
         }
@@ -701,8 +792,10 @@ namespace KeywordsPresets {
             if (name != sanitized) {
                 LOG_INFO << "Preset" << row << name << "renamed to" << sanitized;
                 m_PresetsList[row]->m_PresetName = sanitized;
+                bool isDuplicate = hasDuplicateNamesUnsafe(name, row);
+                m_PresetsList[row]->setIsNameDuplicateFlag(isDuplicate);
                 justChanged();
-                emit dataChanged(index, index, QVector<int>() << NameRole);
+                emit dataChanged(index, index, QVector<int>() << NameRole << IsNameValidRole);
                 return true;
             }
 
@@ -725,6 +818,16 @@ namespace KeywordsPresets {
         return false;
     }
 
+    Qt::ItemFlags PresetKeywordsModel::flags(const QModelIndex &index) const {
+        int row = index.row();
+
+        if (row < 0 || row >= getPresetsCount()) {
+            return Qt::ItemIsEnabled;
+        }
+
+        return QAbstractItemModel::flags(index) | Qt::ItemIsEditable;
+    }
+
     QHash<int, QByteArray> PresetKeywordsModel::roleNames() const {
         QHash<int, QByteArray> roles = QAbstractListModel::roleNames();
         roles[NameRole] = "name";
@@ -734,18 +837,19 @@ namespace KeywordsPresets {
         roles[GroupRole] = "group";
         roles[EditGroupRole] = "editgroup";
         roles[IdRole] = "pid";
+        roles[IsNameValidRole] = "isnamevalid";
         return roles;
     }
 
     void PresetKeywordsModel::removeInnerItem(int row) {
         Q_ASSERT(row >= 0 && row < getPresetsCount());
-        PresetModel *item = m_PresetsList[row];
         m_PresetsList.erase(m_PresetsList.begin() + row);
-        if (item->release()) {
-            delete item;
-        } else {
-            m_Finalizers.push_back(item);
-        }
+    }
+
+    FilteredPresetsModelBase::FilteredPresetsModelBase(PresetKeywordsModel &presetsModel):
+        m_PresetKeywordsModel(presetsModel)
+    {
+        setSourceModel(&presetsModel);
     }
 
     int FilteredPresetsModelBase::getOriginalIndex(int index) {
@@ -759,28 +863,30 @@ namespace KeywordsPresets {
         LOG_INFO << index;
         QModelIndex originalIndex = mapToSource(this->index(index, 0));
         int row = originalIndex.row();
-        PresetKeywordsModel *presetsModel = getPresetsModel();
-        ID_t id = presetsModel->getPresetID(row);
+        auto &presetsModel = getPresetsModel();
+        ID_t id = presetsModel.getPresetID(row);
         return (unsigned int)id;
     }
 
     QString FilteredPresetsModelBase::getName(int index) {
         int originalIndex = getOriginalIndex(index);
-        PresetKeywordsModel *presetsModel = getPresetsModel();
+        auto &presetsModel = getPresetsModel();
         QString name;
 
-        if (!presetsModel->tryGetNameFromIndex(originalIndex, name)) {
+        if (!presetsModel.tryGetNameFromIndex(originalIndex, name)) {
             name = QObject::tr("Untitled");
         }
 
         return name;
     }
 
-    PresetKeywordsModel *FilteredPresetsModelBase::getPresetsModel() const {
-        QAbstractItemModel *sourceItemModel = sourceModel();
-        PresetKeywordsModel *presetsModel = dynamic_cast<PresetKeywordsModel *>(sourceItemModel);
-        Q_ASSERT(presetsModel != nullptr);
-        return presetsModel;
+    PresetKeywordsModel &FilteredPresetsModelBase::getPresetsModel() const {
+        return m_PresetKeywordsModel;
+    }
+
+    FilteredPresetKeywordsModel::FilteredPresetKeywordsModel(PresetKeywordsModel &presetsModel):
+        FilteredPresetsModelBase(presetsModel)
+    {
     }
 
     void FilteredPresetKeywordsModel::setSearchTerm(const QString &value) {
@@ -803,16 +909,17 @@ namespace KeywordsPresets {
 
         bool result = false;
 
-        PresetKeywordsModel *presetsModel = getPresetsModel();
+        auto &presetsModel = getPresetsModel();
         QString name;
-        if (presetsModel->tryGetNameFromIndexUnsafe(sourceRow, name)) {
+        if (presetsModel.tryGetNameFromIndexUnsafe(sourceRow, name)) {
             result = name.contains(m_SearchTerm, Qt::CaseInsensitive);
         }
 
         return result;
     }
 
-    PresetKeywordsGroupModel::PresetKeywordsGroupModel(int groupID):
+    PresetKeywordsGroupModel::PresetKeywordsGroupModel(int groupID, PresetKeywordsModel &presetsModel):
+        FilteredPresetsModelBase(presetsModel),
         m_GroupID(groupID)
     {
         LOG_DEBUG << "Instantiated for group" << groupID;
@@ -823,9 +930,9 @@ namespace KeywordsPresets {
 
         bool result = false;
 
-        PresetKeywordsModel *presetsModel = getPresetsModel();
+        auto &presetsModel = getPresetsModel();
         int groupID;
-        if (presetsModel->tryGetGroupFromIndexUnsafe(sourceRow, groupID)) {
+        if (presetsModel.tryGetGroupFromIndexUnsafe(sourceRow, groupID)) {
             result = m_GroupID == groupID;
         }
 

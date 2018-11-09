@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -89,7 +89,7 @@ Item {
             anchors.bottomMargin: -glowRadius/2
             glowRadius: 4
             spread: 0.0
-            color: uiColors.defaultControlColor
+            color: uiColors.popupGlowColor
             cornerRadius: glowRadius
         }
 
@@ -156,7 +156,7 @@ Item {
                         text: i18.n + qsTr("Add")
                         width: 90
                         enabled: !addGroupComponent.anyError && (groupNameInput.text.trim().length > 2)
-                        onClicked: submitGroupName()
+                        onClicked: submitGroupName(groupNameInput.text)
                     }
 
                     StyledButton {

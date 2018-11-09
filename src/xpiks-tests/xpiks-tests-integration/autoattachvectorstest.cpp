@@ -1,48 +1,33 @@
 #include "autoattachvectorstest.h"
 #include <QUrl>
-#include <QFileInfo>
-#include <QStringList>
+#include <QList>
 #include "integrationtestbase.h"
 #include "signalwaiter.h"
-#include "../../xpiks-qt/Commands/commandmanager.h"
-#include "../../xpiks-qt/Models/artitemsmodel.h"
-#include "../../xpiks-qt/MetadataIO/metadataiocoordinator.h"
-#include "../../xpiks-qt/Models/artworkmetadata.h"
-#include "../../xpiks-qt/Models/settingsmodel.h"
-#include "../../xpiks-qt/Models/imageartwork.h"
+#include "xpikstestsapp.h"
+#include "Artworks/imageartwork.h"
 
 QString AutoAttachVectorsTest::testName() {
     return QLatin1String("AutoAttachVectorsTest");
 }
 
 void AutoAttachVectorsTest::setup() {
-    Models::SettingsModel *settingsModel = m_CommandManager->getSettingsModel();
-    settingsModel->setAutoFindVectors(true);
+    m_TestsApp.getSettingsModel().setAutoFindVectors(true);
+
+    // copy files
+    setupFilePathForTest("images-for-tests/vector/026.eps");
+    setupFilePathForTest("images-for-tests/vector/027.eps");
 }
 
 int AutoAttachVectorsTest::doTest() {
-    Models::ArtItemsModel *artItemsModel = m_CommandManager->getArtItemsModel();
     QList<QUrl> files;
-    files << getFilePathForTest("images-for-tests/vector/026.jpg");
-    files << getFilePathForTest("images-for-tests/vector/027.jpg");
+    files << setupFilePathForTest("images-for-tests/vector/026.jpg");
+    files << setupFilePathForTest("images-for-tests/vector/027.jpg");
 
-    MetadataIO::MetadataIOCoordinator *ioCoordinator = m_CommandManager->getMetadataIOCoordinator();
-    SignalWaiter waiter;
-    QObject::connect(ioCoordinator, SIGNAL(metadataReadingFinished()), &waiter, SIGNAL(finished()));
-
-    int addedCount = artItemsModel->addLocalArtworks(files);
-    VERIFY(addedCount == files.length(), "Failed to add files");
-    ioCoordinator->continueReading(true);
-
-    if (!waiter.wait(20)) {
-        VERIFY(false, "Timeout exceeded for reading metadata.");
-    }
-
-    VERIFY(!ioCoordinator->getHasErrors(), "Errors in IO Coordinator while reading");
+    VERIFY(m_TestsApp.addFilesForTest(files), "Failed to add files");
 
     for (int i = 0; i < files.length(); ++i) {
-        Models::ArtworkMetadata *metadata = artItemsModel->getArtwork(i);
-        Models::ImageArtwork *image = dynamic_cast<Models::ImageArtwork *>(metadata);
+        auto artwork = m_TestsApp.getArtwork(i);
+        auto image = std::dynamic_pointer_cast<Artworks::ImageArtwork>(artwork);
         VERIFY(image != NULL && image->hasVectorAttached(), "Vector is not attached!");
     }
 

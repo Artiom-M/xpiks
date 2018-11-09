@@ -1,15 +1,17 @@
 #ifndef COMBINEDMODELTESTS_H
 #define COMBINEDMODELTESTS_H
 
-#include <QtTest/QtTest>
-#include "Mocks/commandmanagermock.h"
-#include "../../xpiks-qt/Models/settingsmodel.h"
+#include <QObject>
+#include <QtTest>  // IWYU pragma: keep
+// IWYU pragma: no_include <QString>
 
 class CombinedModelTests : public QObject {
     Q_OBJECT
 
+public:
+    CombinedModelTests(QObject *parent = nullptr);
+
 private slots:
-    void initTestCase();
     void trivialCombineNoItemsTest();
     void trivialCombineOneItemTest();
     void combineSeveralSameItemsTest();
@@ -55,10 +57,6 @@ private slots:
     void caseIsPreservedForOneItemTest();
     void caseIsPreservedForSeveralItemsTest();
     void clearKeywordsFiresKeywordsCountTest();
-
-private:
-    Mocks::CommandManagerMock m_CommandManagerMock;
-    Models::SettingsModel m_SettingsModel;
 };
 
 #endif // COMBINEDMODELTESTS_H

@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,7 +9,10 @@
  */
 
 #include "cachedimage.h"
-#include "../Common/version.h"
+
+#include <QDataStream>
+
+#include "Common/version.h"
 
 namespace QMLExtensions {
     CachedImage::CachedImage():
@@ -43,7 +46,7 @@ namespace QMLExtensions {
 
     QDataStream &operator<<(QDataStream &out, const CachedImage &v) {
         // TODO: update before release to Qt 5.9
-        Q_ASSERT(!XPIKS_VERSION_CHECK(1, 5, 0));
+        Q_ASSERT(!XPIKS_VERSION_CHECK(1, 6, 0));
 #ifndef TRAVIS_CI
         out.setVersion(QDataStream::Qt_5_6);
 #endif
@@ -61,7 +64,7 @@ namespace QMLExtensions {
 
     QDataStream &operator>>(QDataStream &in, CachedImage &v) {
         // TODO: update before release to Qt 5.9
-        Q_ASSERT(!XPIKS_VERSION_CHECK(1, 5, 0));
+        Q_ASSERT(!XPIKS_VERSION_CHECK(1, 6, 0));
 #ifndef TRAVIS_CI
         in.setVersion(QDataStream::Qt_5_6);
 #endif

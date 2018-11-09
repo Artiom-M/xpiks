@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -25,8 +25,10 @@ Item {
     anchors.fill: parent
 
     property variant componentParent
+    property var autoCompleteBox
 
-    Component.onCompleted: {
+    function onAutoCompleteClose() {
+        autoCompleteBox = undefined
     }
 
     Keys.onEscapePressed: closePopup()
@@ -106,7 +108,7 @@ Item {
             anchors.bottomMargin: -glowRadius/2
             glowRadius: 4
             spread: 0.0
-            color: uiColors.defaultControlColor
+            color: uiColors.popupGlowColor
             cornerRadius: glowRadius
         }
 
@@ -126,10 +128,10 @@ Item {
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
                 width: 250
-                //enabled: !csvExportModel.isExporting
 
                 ListView {
                     id: presetNamesListView
+                    objectName: "presetNamesListView"
                     model: presetsModel
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -139,14 +141,6 @@ Item {
                     anchors.bottomMargin: 10
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
-
-                    add: Transition {
-                        NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 230 }
-                    }
-
-                    remove: Transition {
-                        NumberAnimation { property: "opacity"; to: 0; duration: 230 }
-                    }
 
                     displaced: Transition {
                         NumberAnimation { properties: "x,y"; duration: 230 }
@@ -250,6 +244,7 @@ Item {
 
                     StyledBlackButton {
                         id: addPresetButton
+                        objectName: "addPresetButton"
                         width: 210
                         height: 30
                         anchors.centerIn: parent
@@ -275,6 +270,70 @@ Item {
                 anchors.top: parent.top
                 anchors.bottom: footer.top
 
+                Connections {
+                    target: acSource
+
+                    onCompletionsAvailable: {
+                        acSource.initializeCompletions()
+
+                        if (typeof presetEditComponent.autoCompleteBox !== "undefined") {
+                            if (presetEditComponent.autoCompleteBox.isBelowEdit) {
+                                // update completion
+                                return;
+                            }
+                        }
+
+                        var directParent = presetEditComponent;
+                        var currWordStartRect = flv.editControl.getCurrentWordStartRect()
+
+                        var tmp = flv.editControl.mapToItem(directParent,
+                                                            currWordStartRect.x - 17,
+                                                            flv.editControl.height + 1)
+
+                        var visibleItemsCount = Math.min(acSource.getCount(), 5);
+                        var popupHeight = visibleItemsCount * (25 + 1) + 10
+
+                        if (typeof presetEditComponent.autoCompleteBox !== "undefined") {
+                            if (!presetEditComponent.autoCompleteBox.isBelowEdit) {
+                                presetEditComponent.autoCompleteBox.anchors.topMargin = tmp.y - popupHeight - flv.editControl.height - 2
+                            }
+                            // update completion
+                            return
+                        }
+
+                        var isBelow = (tmp.y + popupHeight) < directParent.height;
+
+                        var options = {
+                            model: acSource.getCompletionsModelObject(),
+                            autoCompleteSource: acSource,
+                            isBelowEdit: isBelow,
+                            withPresets: false,
+                            "anchors.left": directParent.left,
+                            "anchors.leftMargin": Math.min(tmp.x, directParent.width - 200),
+                            "anchors.top": directParent.top
+                        }
+
+                        if (isBelow) {
+                            options["anchors.topMargin"] = tmp.y
+                        } else {
+                            options["anchors.topMargin"] = tmp.y - popupHeight - flv.editControl.height - 2
+                        }
+
+                        var component = Qt.createComponent("../Components/CompletionBox.qml");
+                        if (component.status !== Component.Ready) {
+                            console.warn("Component Error: " + component.errorString());
+                        } else {
+                            var instance = component.createObject(directParent, options);
+
+                            instance.boxDestruction.connect(presetEditComponent.onAutoCompleteClose)
+                            instance.itemSelected.connect(flv.acceptCompletion)
+                            presetEditComponent.autoCompleteBox = instance
+
+                            instance.openPopup()
+                        }
+                    }
+                }
+
                 MouseArea {
                     id: rightPanelMA
                     anchors.fill: parent
@@ -296,7 +355,8 @@ Item {
                     Rectangle {
                         id: titleWrapper
                         border.width: titleText.activeFocus ? 1 : 0
-                        border.color: uiColors.artworkActiveColor
+                        property bool isValid: presetNamesListView.currentItem ? presetNamesListView.currentItem.myData.isnamevalid : false
+                        border.color: isValid ? uiColors.artworkActiveColor : uiColors.artworkModifiedColor
                         anchors.left: parent.left
                         anchors.right: parent.right
                         color: enabled ? uiColors.inputBackgroundColor : uiColors.inputInactiveBackground
@@ -304,6 +364,7 @@ Item {
 
                         StyledTextInput {
                             id: titleText
+                            objectName: "titleEdit"
                             height: parent.height
                             anchors.left: parent.left
                             anchors.right: parent.right
@@ -327,6 +388,8 @@ Item {
                                         presetNamesListView.currentItem.myData.editname = qsTr("Untitled")
                                     }
                                 }
+
+                                presetsModel.makeTitleValid(presetNamesListView.currentIndex)
                             }
 
                             onActiveFocusChanged: {
@@ -454,7 +517,9 @@ Item {
                         Layout.fillHeight: true
                         border.color: uiColors.artworkActiveColor
                         border.width: flv.isFocused ? 1 : 0
-                        color: uiColors.inputBackgroundColor
+                        color: uiColors.inputBackgroundColor                        
+                        property var keywordsModel: presetNamesListView.currentItem ? presetsModel.getKeywordsModelObject(presetNamesListView.currentIndex) : []
+                        state: ""
 
                         function removeKeyword(index) {
                             presetsModel.removeKeywordAt(presetNamesListView.currentIndex, index)
@@ -465,7 +530,11 @@ Item {
                         }
 
                         function appendKeyword(keyword) {
-                            presetsModel.appendKeyword(presetNamesListView.currentIndex, keyword)
+                            var added = presetsModel.appendKeyword(presetNamesListView.currentIndex, keyword)
+                            if (!added) {
+                                keywordsWrapper.state = "blinked"
+                                blinkTimer.start()
+                            }
                         }
 
                         function pasteKeywords(keywordsList) {
@@ -474,11 +543,18 @@ Item {
 
                         EditableTags {
                             id: flv
+                            objectName: "editableTags"
                             anchors.fill: parent
                             enabled: presetNamesListView.currentIndex >= 0
-                            model: presetsModel.getKeywordsModel(presetNamesListView.currentIndex)
+                            model: keywordsWrapper.keywordsModel
                             property int keywordHeight: uiManager.keywordHeight
                             scrollStep: keywordHeight
+
+                            function acceptCompletion(completionID) {
+                                // do not handle preset insertion here
+                                var completion = acSource.getCompletion(completionID)
+                                flv.editControl.acceptCompletion(completion)
+                            }
 
                             delegate: KeywordWrapper {
                                 id: kw
@@ -499,15 +575,13 @@ Item {
                                         }
                                     }
 
-                                    var basicModel = presetsModel.getKeywordsModel(presetNamesListView.currentIndex)
-
                                     Common.launchDialog("Dialogs/EditKeywordDialog.qml",
                                                         componentParent,
                                                         {
                                                             callbackObject: callbackObject,
                                                             previousKeyword: keyword,
                                                             keywordIndex: kw.delegateIndex,
-                                                            keywordsModel: basicModel
+                                                            keywordsModel: keywordsWrapper.keywordsModel
                                                         })
                                 }
                             }
@@ -530,7 +604,7 @@ Item {
                             }
 
                             onCompletionRequested: {
-                                // no completion in presets for now
+                                dispatcher.dispatch(UICommand.GenerateCompletions, prefix)
                             }
                         }
 
@@ -539,6 +613,22 @@ Item {
                             anchors.bottomMargin: -5
                             anchors.rightMargin: -15
                             flickable: flv
+                        }
+
+                        Timer {
+                            id: blinkTimer
+                            repeat: false
+                            interval: 400
+                            triggeredOnStart: false
+                            onTriggered: keywordsWrapper.state = ""
+                        }
+
+                        states: State {
+                            name: "blinked";
+                            PropertyChanges {
+                                target: keywordsWrapper;
+                                border.width: 0
+                            }
                         }
                     }
                 }
@@ -562,7 +652,7 @@ Item {
                     spacing: 20
 
                     StyledLink {
-                        id: plainTextText
+                        objectName: "plainTextLink"
                         text: i18.n + qsTr("<u>edit in plain text</u>")
                         normalLinkColor: uiColors.labelActiveForeground
                         enabled: presetNamesListView.currentItem ? true : false
@@ -580,14 +670,12 @@ Item {
                                 }
                             }
 
-                            var basicModel = presetsModel.getKeywordsModel(presetNamesListView.currentIndex)
-
-                            Common.launchDialog("../Dialogs/PlainTextKeywordsDialog.qml",
-                                                applicationWindow,
+                            Common.launchDialog("Dialogs/PlainTextKeywordsDialog.qml",
+                                                componentParent,
                                                 {
                                                     callbackObject: callbackObject,
                                                     keywordsText: presetNamesListView.currentItem.myData.keywordsstring,
-                                                    keywordsModel: basicModel
+                                                    keywordsModel: keywordsWrapper.keywordsModel
                                                 });
                         }
                     }

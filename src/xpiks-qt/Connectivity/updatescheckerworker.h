@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -12,9 +12,18 @@
 #define UPDATESCHECKERWORKER_H
 
 #include <QObject>
+#include <QString>
+
+namespace Common {
+    class ISystemEnvironment;
+}
 
 namespace Models {
     class SettingsModel;
+}
+
+namespace Maintenance {
+    class MaintenanceService;
 }
 
 namespace Connectivity {
@@ -28,8 +37,10 @@ namespace Connectivity {
     {
         Q_OBJECT
     public:
-        UpdatesCheckerWorker(Models::SettingsModel *settingsModel, const QString &availableUpdatePath);
-        virtual ~UpdatesCheckerWorker();
+        UpdatesCheckerWorker(Common::ISystemEnvironment &environment,
+                             Models::SettingsModel &settingsModel,
+                             Maintenance::MaintenanceService &maintenanceService,
+                             const QString &availableUpdatePath);
 
     private:
         void initWorker();
@@ -49,7 +60,9 @@ namespace Connectivity {
         void cancelRequested();
 
     private:
-        Models::SettingsModel *m_SettingsModel;
+        Common::ISystemEnvironment &m_Environment;
+        Models::SettingsModel &m_SettingsModel;
+        Maintenance::MaintenanceService &m_MaintenanceService;
         QString m_UpdatesDirectory;
         QString m_AvailableUpdatePath;
     };

@@ -1,40 +1,64 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include <QHash>
-#include <QString>
-#include <QMultiMap>
 #include "keywordssuggestor.h"
-#include "suggestionartwork.h"
-#include "../Commands/commandmanager.h"
-#include "../Common/defines.h"
-#include "../QuickBuffer/quickbuffer.h"
-#include "suggestionqueryenginebase.h"
-#include "shutterstockqueryengine.h"
-#include "locallibraryqueryengine.h"
-#include "fotoliaqueryengine.h"
-#include "gettyqueryengine.h"
-#include "../Models/switchermodel.h"
-#include "../Models/settingsmodel.h"
-#include "../Helpers/constants.h"
+
+#include <cstddef>
+#include <utility>
+
+#include <QByteArray>
+#include <QHash>
+#include <QMap>
+#include <QMultiMap>
+#include <QQmlEngine>
+#include <QString>
+#include <QTime>
+#include <QVector>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Artworks/basickeywordsmodel.h"
+#include "Common/logging.h"
+#include "Common/statefulentity.h"
+#include "Connectivity/analyticsuserevent.h"
+#include "Helpers/constants.h"
+#include "Microstocks/microstockenums.h"
+#include "Microstocks/searchquery.h"
+#include "Models/Editing/quickbuffermessage.h"
+#include "Models/settingsmodel.h"
+#include "Models/switchermodel.h"
+#include "Suggestion/isuggestionengine.h"
+#include "Suggestion/suggestionartwork.h"
+
+#ifndef CORE_TESTS
+#include "Microstocks/imicrostockapiclients.h"
+#include "Suggestion/fotoliasuggestionengine.h"
+#include "Suggestion/gettysuggestionengine.h"
+#include "Suggestion/locallibraryqueryengine.h"
+#include "Suggestion/shutterstocksuggestionengine.h"
+#endif
 
 #define LINEAR_TIMER_INTERVAL 1000
 #define DEFAULT_SEARCH_TYPE_INDEX 0
 
 namespace Suggestion {
-    KeywordsSuggestor::KeywordsSuggestor(QObject *parent):
+    KeywordsSuggestor::KeywordsSuggestor(Models::SwitcherModel &switcherModel,
+                                         Models::SettingsModel &settingsModel,
+                                         Common::ISystemEnvironment &environment,
+                                         QObject *parent):
         QAbstractListModel(parent),
-        Common::BaseEntity(),
-        Common::StatefulEntity("ksuggest"),
-        m_SuggestedKeywords(m_HoldPlaceholder, this),
-        m_AllOtherKeywords(m_HoldPlaceholder, this),
+        m_State("ksuggest", environment),
+        m_SwitcherModel(switcherModel),
+        m_SettingsModel(settingsModel),
+        m_SuggestedKeywords(this),
+        m_AllOtherKeywords(this),
         m_SelectedArtworksCount(0),
         m_SelectedSourceIndex(0),
         m_LocalSearchIndex(-1),
@@ -45,10 +69,9 @@ namespace Suggestion {
 
         m_LinearTimer.setSingleShot(true);
         QObject::connect(&m_LinearTimer, &QTimer::timeout, this, &KeywordsSuggestor::onLinearTimer);
-    }
 
-    KeywordsSuggestor::~KeywordsSuggestor() {
-        qDeleteAll(m_QueryEngines);
+        QObject::connect(&m_SwitcherModel, &Models::SwitcherModel::switchesUpdated,
+                         this, &KeywordsSuggestor::onSwitchesUpdated);
     }
 
     void KeywordsSuggestor::setExistingKeywords(const QSet<QString> &keywords) {
@@ -56,31 +79,48 @@ namespace Suggestion {
         m_ExistingKeywords.clear(); m_ExistingKeywords.unite(keywords);
     }
 
-    void KeywordsSuggestor::initSuggestionEngines() {
-        Q_ASSERT(m_CommandManager != NULL);
-        auto *settingsModel = m_CommandManager->getSettingsModel();
-        auto *metadataIOService = m_CommandManager->getMetadataIOService();
-
+    void KeywordsSuggestor::initSuggestionEngines(Microstocks::IMicrostockAPIClients &microstockClients,
+                                                  Connectivity::RequestsService &requestsService,
+                                                  MetadataIO::MetadataIOService &metadataIOService) {
+        LOG_DEBUG << "#";
+#ifndef CORE_TESTS
         int id = 0;
-        m_QueryEngines.append(new ShutterstockQueryEngine(id++, settingsModel));
-        m_QueryEngines.append(new GettyQueryEngine(id++, settingsModel));
-        m_QueryEngines.append(new FotoliaQueryEngine(id++, settingsModel));
-        m_QueryEngines.append(new LocalLibraryQueryEngine(id++, metadataIOService));
-        m_LocalSearchIndex = m_QueryEngines.length() - 1;
+        auto shutterstockEngine = std::make_shared<ShutterstockSuggestionEngine>(
+                                      id++,
+                                      microstockClients.getClient(Microstocks::MicrostockType::Shutterstock),
+                                      requestsService);
+        QObject::connect(shutterstockEngine.get(), &ShutterstockSuggestionEngine::resultsAvailable,
+                         this, &KeywordsSuggestor::resultsAvailableHandler);
+        m_QueryEngines.emplace_back(shutterstockEngine);
 
-        int length = m_QueryEngines.length();
-        for (int i = 0; i < length; ++i) {
-            SuggestionQueryEngineBase *engine = m_QueryEngines.at(i);
-            m_QueryEnginesNames.append(engine->getName());
+        auto gettyEngine = std::make_shared<GettySuggestionEngine>(
+                               id++,
+                               microstockClients.getClient(Microstocks::MicrostockType::Getty),
+                               requestsService);
+        QObject::connect(gettyEngine.get(), &GettySuggestionEngine::resultsAvailable,
+                         this, &KeywordsSuggestor::resultsAvailableHandler);
+        m_QueryEngines.emplace_back(gettyEngine);
 
-            QObject::connect(engine, &SuggestionQueryEngineBase::resultsAvailable,
-                             this, &KeywordsSuggestor::resultsAvailableHandler);
+        // https://github.com/ribtoks/xpiks/issues/463
+        gettyEngine->setIsEnabled(m_SwitcherModel.getGettySuggestionEnabled());
 
-            QObject::connect(engine, &SuggestionQueryEngineBase::errorReceived,
-                             this, &KeywordsSuggestor::errorsReceivedHandler);
-        }
+        auto fotoliaEngine = std::make_shared<FotoliaSuggestionEngine>(
+                                 id++,
+                                 microstockClients.getClient(Microstocks::MicrostockType::Fotolia),
+                                 requestsService);
+        QObject::connect(fotoliaEngine.get(), &FotoliaSuggestionEngine::resultsAvailable,
+                         this, &KeywordsSuggestor::resultsAvailableHandler);
+        m_QueryEngines.emplace_back(fotoliaEngine);
 
-        initState();
+        auto localEngine = std::make_shared<LocalLibraryQueryEngine>(
+                               id++,
+                               metadataIOService);
+        QObject::connect(localEngine.get(), &LocalLibraryQueryEngine::resultsAvailable,
+                         this, &KeywordsSuggestor::resultsAvailableHandler);
+        m_QueryEngines.emplace_back(localEngine);
+        m_LocalSearchIndex = (int)m_QueryEngines.size() - 1;
+#endif
+        m_State.init();
     }
 
     void KeywordsSuggestor::setSuggestedArtworks(std::vector<std::shared_ptr<SuggestionArtwork> > &suggestedArtworks) {
@@ -91,12 +131,10 @@ namespace Suggestion {
         m_SuggestedKeywords.clearKeywords();
         m_AllOtherKeywords.clearKeywords();
 
-        Models::SettingsModel *settingsModel = m_CommandManager->getSettingsModel();
 #if !defined(INTEGRATION_TESTS) && !defined(CORE_TESTS)
-        Models::SwitcherModel *switcher = m_CommandManager->getSwitcherModel();
         const bool sequentialLoading =
-                (switcher->getProgressiveSuggestionPreviewsOn() ||
-                 settingsModel->getUseProgressiveSuggestionPreviews()) &&
+                (m_SwitcherModel.getProgressiveSuggestionPreviewsOn() ||
+                 m_SettingsModel.getUseProgressiveSuggestionPreviews()) &&
                 (!getIsLocalSearch());
 #else
         const bool sequentialLoading = false;
@@ -104,7 +142,7 @@ namespace Suggestion {
         LOG_INFO << "With sequential loading:" << sequentialLoading;
 
         if (sequentialLoading) {
-            const int increment = settingsModel->getProgressiveSuggestionIncrement();
+            const int increment = m_SettingsModel.getProgressiveSuggestionIncrement();
             m_LoadedPreviewsNumber = increment;
             LOG_DEBUG << "Progressive increment is" << increment;
         } else {
@@ -153,7 +191,7 @@ namespace Suggestion {
     void KeywordsSuggestor::setSelectedSourceIndex(int value) {
         if (!m_IsInProgress && (value != m_SelectedSourceIndex)) {
             if (0 <= value &&
-                    value < m_QueryEngines.length()) {
+                    value < (int)m_QueryEngines.size()) {
                 LOG_INFO << "Selected query source index:" << value;
                 m_SelectedSourceIndex = value;
                 emit selectedSourceIndexChanged();
@@ -163,15 +201,15 @@ namespace Suggestion {
     }
 
     int KeywordsSuggestor::getSearchTypeIndex() const {
-        return getStateInt(Constants::suggestorSearchTypeIndex, DEFAULT_SEARCH_TYPE_INDEX);
+        return m_State.getInt(Constants::suggestorSearchTypeIndex, DEFAULT_SEARCH_TYPE_INDEX);
     }
 
     void KeywordsSuggestor::setSearchTypeIndex(int value) {
         int current = getSearchTypeIndex();
         if (current != value) {
-            setStateValue(Constants::suggestorSearchTypeIndex, value);
-            emit suggestedKeywordsCountChanged();
-            syncState();
+            m_State.setValue(Constants::suggestorSearchTypeIndex, value);
+            emit searchTypeIndexChanged();
+            m_State.sync();
         }
     }
 
@@ -182,18 +220,12 @@ namespace Suggestion {
     }
 
     void KeywordsSuggestor::resultsAvailableHandler() {
-        Q_ASSERT(0 <= m_SelectedSourceIndex && m_SelectedSourceIndex < m_QueryEngines.length());
-        SuggestionQueryEngineBase *currentEngine = m_QueryEngines.at(m_SelectedSourceIndex);
-        SuggestionQueryEngineBase *senderEngine = qobject_cast<SuggestionQueryEngineBase *>(sender());
-
-        if ((senderEngine == nullptr) || (senderEngine->getID() != currentEngine->getID())) {
-            qInfo() << "Received results from another engine:" <<
-                       ((senderEngine != nullptr) ? senderEngine->getID() : (-1)) << "current:" << currentEngine->getID();
-        }
-
+        auto engine = getSelectedEngine();
         unsetInProgress();
-        auto &results = currentEngine->getLastResults();
-        setSuggestedArtworks(results);
+        if (engine) {
+            auto &results = engine->getSuggestions();
+            setSuggestedArtworks(results);
+        }
     }
 
     void KeywordsSuggestor::errorsReceivedHandler(const QString &error) {
@@ -205,8 +237,7 @@ namespace Suggestion {
         const int size = rowCount();
         if (m_LoadedPreviewsNumber >= size) { return; }
 
-        Models::SettingsModel *settingsModel = m_CommandManager->getSettingsModel();
-        const int increment = settingsModel->getProgressiveSuggestionIncrement();
+        const int increment = m_SettingsModel.getProgressiveSuggestionIncrement();
 
         QModelIndex firstIndex = this->index(m_LoadedPreviewsNumber);
         int nextIndex = m_LoadedPreviewsNumber + increment;
@@ -221,25 +252,42 @@ namespace Suggestion {
         m_LinearTimer.start(LINEAR_TIMER_INTERVAL);
     }
 
-    void KeywordsSuggestor::onLanguageChanged() {
-        m_QueryEnginesNames.clear();
-        int length = m_QueryEngines.length();
-
-        for (int i = 0; i < length; ++i) {
-            SuggestionQueryEngineBase *engine = m_QueryEngines.at(i);
-            m_QueryEnginesNames.append(engine->getName());
+    void KeywordsSuggestor::onSwitchesUpdated() {
+        LOG_DEBUG << "#";
+        bool found = false;
+#ifndef CORE_TESTS
+        for (auto &engine: m_QueryEngines) {
+            auto gettyEngine = std::dynamic_pointer_cast<GettySuggestionEngine>(engine);
+            if (gettyEngine) {
+                gettyEngine->setIsEnabled(m_SwitcherModel.getGettySuggestionEnabled());
+                found = true;
+                break;
+            }
         }
+#endif
 
+        if (!found) {
+            LOG_WARNING << "Failed to find Getty engine";
+        } else {
+            emit engineNamesChanged();
+        }
+    }
+
+    void KeywordsSuggestor::onLanguageChanged() {
         setLastErrorString(tr("No results found"));
+        emit engineNamesChanged();
     }
 
     bool KeywordsSuggestor::isLocalSuggestionActive() const {
         const int index = getSelectedSourceIndex();
         if ((index < 0) || (index >= (int)m_QueryEngines.size())) { return false; }
 
-        SuggestionQueryEngineBase *engine = m_QueryEngines.at(index);
-        LocalLibraryQueryEngine *localEngine = dynamic_cast<LocalLibraryQueryEngine*>(engine);
-        bool result = localEngine != nullptr;
+        bool result = false;
+#ifndef CORE_TESTS
+        auto &engine = m_QueryEngines.at(index);
+        auto localEngine = std::dynamic_pointer_cast<LocalLibraryQueryEngine>(engine);
+        result = localEngine != nullptr;
+#endif
         return result;
     }
 
@@ -291,8 +339,13 @@ namespace Suggestion {
         }
 
         auto &suggestionArtwork = m_Suggestions.at(index);
-        auto *quickBuffer = m_CommandManager->getQuickBuffer();
-        quickBuffer->setFromSuggestionArtwork(suggestionArtwork);
+
+        sendMessage(
+                    Models::QuickBufferMessage(
+                        QString(suggestionArtwork->getTitle()),
+                        QString(suggestionArtwork->getDescription()),
+                        suggestionArtwork->getKeywordsSet().toList(),
+                        true));
     }
 
     void KeywordsSuggestor::searchArtworks(const QString &searchTerm, int resultsType) {
@@ -301,17 +354,36 @@ namespace Suggestion {
         if (!m_IsInProgress && !searchTerm.trimmed().isEmpty()) {
             setInProgress();
 
-            SuggestionQueryEngineBase *engine = m_QueryEngines.at(m_SelectedSourceIndex);
-            SearchQuery query(searchTerm, resultsType, engine->getMaxResults());
-            engine->submitQuery(query);
-
+            auto engine = getSelectedEngine();
+            if (engine) {
+                Microstocks::SearchQuery query(searchTerm, resultsType, engine->getMaxResultsPerPage());
+                engine->submitQuery(query);
+#ifndef CORE_TESTS
+                if (std::dynamic_pointer_cast<LocalLibraryQueryEngine>(engine) == nullptr) {
+                    sendMessage(Connectivity::UserAction::SuggestionRemote);
+                } else {
+                    sendMessage(Connectivity::UserAction::SuggestionLocal);
+                }
+#endif
+            }
         }
     }
 
     void KeywordsSuggestor::cancelSearch() {
         LOG_DEBUG << "#";
-        SuggestionQueryEngineBase *engine = m_QueryEngines.at(m_SelectedSourceIndex);
-        engine->cancelQueries();
+        auto engine = getSelectedEngine();
+        if (engine) {
+            engine->cancelQuery();
+        }
+    }
+
+    QStringList KeywordsSuggestor::getEngineNames() const {
+        QStringList names;
+        for (auto &engine: m_QueryEngines) {
+            if (!engine->getIsEnabled()) { continue; }
+            names.append(engine->getName());
+        }
+        return names;
     }
 
     void KeywordsSuggestor::clearSuggested() {
@@ -343,6 +415,18 @@ namespace Suggestion {
         emit suggestedKeywordsCountChanged();
         emit otherKeywordsCountChanged();
         emit selectedArtworksCountChanged();
+    }
+
+    QObject *KeywordsSuggestor::getSuggestedKeywordsModel() {
+        QObject *item = &m_SuggestedKeywords;
+        QQmlEngine::setObjectOwnership(item, QQmlEngine::CppOwnership);
+        return item;
+    }
+
+    QObject *KeywordsSuggestor::getAllOtherKeywordsModel() {
+        QObject *item = &m_AllOtherKeywords;
+        QQmlEngine::setObjectOwnership(item, QQmlEngine::CppOwnership);
+        return item;
     }
 
     int KeywordsSuggestor::rowCount(const QModelIndex &parent) const {
@@ -493,5 +577,25 @@ namespace Suggestion {
             upperBound = m_SelectedArtworksCount / 2;
             lowerBound = upperBound - 2;
         }
+    }
+
+    std::shared_ptr<ISuggestionEngine> KeywordsSuggestor::getSelectedEngine() {
+        const int selectedIndex = m_SelectedSourceIndex;
+        int index = 0;
+        for (auto &engine: m_QueryEngines) {
+            if (engine->getIsEnabled() == false) { continue; }
+            if (index == selectedIndex) { break; }
+            index++;
+        }
+
+        std::shared_ptr<ISuggestionEngine> result;
+
+        if ((0 <= index) && (index < (int)m_QueryEngines.size())) {
+            result = m_QueryEngines[index];
+        }  else {
+            LOG_WARNING << "Failed to find current engine by index" << selectedIndex;
+        }
+
+        return result;
     }
 }

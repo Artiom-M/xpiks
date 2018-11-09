@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,13 +11,21 @@
 #ifndef TABSMODEL_H
 #define TABSMODEL_H
 
+#include <vector>
+
 #include <QAbstractListModel>
+#include <QHash>
+#include <QModelIndex>
+#include <QObject>
+#include <QSet>
 #include <QSortFilterProxyModel>
 #include <QString>
+#include <QVariant>
 #include <QVector>
-#include <QSet>
-#include <vector>
-#include <utility>
+#include <Qt>
+
+class QByteArray;
+class QModelIndex;
 
 #define FILES_FOLDERS_TAB_ID 3
 #define QUICKBUFFER_TAB_ID 5
@@ -36,9 +44,7 @@ namespace QMLExtensions {
             TabIconPathRole = Qt::UserRole + 1
             ,TabComponentPathRole
             ,ExternalTabIDRole
-#ifdef QT_DEBUG
             ,CacheTagRole
-#endif
         };
 
     public:

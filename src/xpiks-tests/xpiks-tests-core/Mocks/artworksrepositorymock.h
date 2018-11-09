@@ -1,14 +1,23 @@
 #ifndef ARTWORKSREPOSITORYMOCK_H
 #define ARTWORKSREPOSITORYMOCK_H
 
-#include <QVector>
-#include <QPair>
-#include "../../xpiks-qt/Models/artworksrepository.h"
+#include <QObject>
+#include <QSet>
+#include <QString>
+
+#include "Models/Artworks/artworksrepository.h"
+
+namespace Models {
+    class RecentDirectoriesModel;
+}
 
 namespace Mocks {
     class ArtworksRepositoryMock : public Models::ArtworksRepository {
     public:
-        ArtworksRepositoryMock() {}
+        ArtworksRepositoryMock(Models::RecentDirectoriesModel &recentDirectories):
+            Models::ArtworksRepository(recentDirectories)
+        {
+        }
 
         void removeFileAndEmitSignal() {
             insertIntoUnavailable(*getFilesSet().begin());

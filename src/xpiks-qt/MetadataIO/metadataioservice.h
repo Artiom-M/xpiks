@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,22 +11,39 @@
 #ifndef METADATAIOSERVICE_H
 #define METADATAIOSERVICE_H
 
-#include <QObject>
-#include <QVector>
-#include "../Common/baseentity.h"
-#include "../Suggestion/locallibraryquery.h"
-#include "artworkssnapshot.h"
-#include "../Common/delayedactionentity.h"
+#include <memory>
 
-namespace Models {
+#include <QObject>
+#include <QString>
+#include <Qt>
+#include <QtGlobal>
+
+#include "Artworks/artworkssnapshot.h"
+#include "Common/delayedactionentity.h"
+
+class QTimerEvent;
+
+namespace Artworks {
     class ArtworkMetadata;
 }
+
+namespace Suggestion {
+    class LocalLibraryQuery;
+}
+
+namespace Storage {
+    class IDatabaseManager;
+}
+
+namespace Services {
+    class ArtworksUpdateHub;
+}
+
 namespace MetadataIO {
     class MetadataIOWorker;
 
     class MetadataIOService:
             public QObject,
-            public Common::BaseEntity,
             public Common::DelayedActionEntity
     {
         Q_OBJECT
@@ -34,18 +51,20 @@ namespace MetadataIO {
         MetadataIOService(QObject *parent = nullptr);
 
     public:
-        void startService();
+        void startService(Storage::IDatabaseManager &databaseManager,
+                          Services::ArtworksUpdateHub &artworksUpdateHub);
         void stopService();
 
     public:
         void cancelBatch(quint32 batchID) const;
+        bool isBusy() const;
+        void waitWorkerIdle();
 
     public:
-        void readArtwork(Models::ArtworkMetadata *metadata) const;
-        void writeArtwork(Models::ArtworkMetadata *metadata);
-        quint32 readArtworks(const ArtworksSnapshot &snapshot) const;
-        void writeArtworks(const WeakArtworksSnapshot &artworks) const;
-        void addArtworks(const WeakArtworksSnapshot &artworks) const;
+        void writeArtwork(std::shared_ptr<Artworks::ArtworkMetadata> const &artwork);
+        quint32 readArtworks(const Artworks::ArtworksSnapshot &snapshot) const;
+        void writeArtworks(const Artworks::ArtworksSnapshot &artworks) const;
+        void addArtworks(const Artworks::ArtworksSnapshot &snapshot) const;
 
     public:
         void searchArtworks(Suggestion::LocalLibraryQuery *query);
@@ -59,8 +78,9 @@ namespace MetadataIO {
 #endif
 
     private slots:
-        void onCacheSyncRequest();
         void workerFinished();
+        void onCacheSyncRequest();
+        void onReadyToImportFromStorage();
 
         // DelayedActionEntity implementation
     protected:

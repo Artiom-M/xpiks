@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -10,7 +10,8 @@
 
 #ifndef WORDANALYSISRESULT_H
 #define WORDANALYSISRESULT_H
-#include <QStringList>
+
+#include <QString>
 
 namespace Common {
     struct WordAnalysisResult {

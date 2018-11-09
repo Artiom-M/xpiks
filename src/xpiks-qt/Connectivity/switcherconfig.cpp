@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,21 +9,22 @@
  */
 
 #include "switcherconfig.h"
-#include <QDir>
+
 #include <QJsonValue>
-#include "apimanager.h"
-#include "../Common/defines.h"
+#include <QJsonValueRef>
+#include <QLatin1String>
+#include <QReadLocker>
+#include <QWriteLocker>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Common/isystemenvironment.h"
+#include "Common/logging.h"
+#include "Connectivity/apimanager.h"
 
 namespace Connectivity {
-#ifdef QT_DEBUG
-    #ifdef INTEGRATION_TESTS
-        #define LOCAL_SWITCHER_CONFIG "tests_switches.json"
-    #else
-        #define LOCAL_SWITCHER_CONFIG "debug_switches.json"
-    #endif
-#else
+
 #define LOCAL_SWITCHER_CONFIG "switches.json"
-#endif
 
 #define VALUE_KEY QLatin1String("v")
 #define THRESHOLD_KEY QLatin1String("t")
@@ -39,31 +40,24 @@ namespace Connectivity {
 #define DIRECT_METADATA_EXPORT QLatin1String("directExport")
 #define GOOD_QUALITY_VIDEO_PREVIEWS QLatin1String("qualityVideoPreviews")
 #define METADATA_AUTO_IMPORT QLatin1String("autoImport")
+#define GETTY_SUGGESTION QLatin1String("iStockSuggestion")
+#define UPDATE_ENABLED QLatin1String("updateEnabled")
+#define KEYWORDS_DRAG_DROP_ENABLED QLatin1String("keywordsDragDropEnabled")
+#define TELEMETRY_ENABLED_KEY QLatin1String("telemetryEnabled")
 
     QDebug operator << (QDebug d, const SwitcherConfig::SwitchValue &value) {
         d << "{" << value.m_IsOn << "*" << value.m_Threshold << "}";
         return d;
     }
 
-    SwitcherConfig::SwitcherConfig(QObject *parent):
-        Models::AbstractConfigUpdaterModel(OVERWRITE_SWITCHER_CONFIG, parent)
+    SwitcherConfig::SwitcherConfig(Common::ISystemEnvironment &environment,
+                                   QObject *parent):
+        Models::AbstractConfigUpdaterModel(
+            environment.path({LOCAL_SWITCHER_CONFIG}),
+            Connectivity::ApiManager::getInstance().getSwitcherAddr(),
+            OVERWRITE_SWITCHER_CONFIG,
+            environment.getIsInMemoryOnly(), parent)
     {
-    }
-
-    void SwitcherConfig::initializeConfigs() {
-        QString localConfigPath;
-
-        QString appDataPath = XPIKS_USERDATA_PATH;
-        if (!appDataPath.isEmpty()) {
-            QDir appDataDir(appDataPath);
-            localConfigPath = appDataDir.filePath(LOCAL_SWITCHER_CONFIG);
-        } else {
-            localConfigPath = LOCAL_SWITCHER_CONFIG;
-        }
-
-        auto &apiManager = Connectivity::ApiManager::getInstance();
-        QString remoteAddress = apiManager.getSwitcherAddr();
-        AbstractConfigUpdaterModel::initializeConfigs(remoteAddress, localConfigPath);
     }
 
     bool SwitcherConfig::isSwitchOn(int switchKey, int minThreshold) {
@@ -82,7 +76,7 @@ namespace Connectivity {
     }
 
     bool SwitcherConfig::processLocalConfig(const QJsonDocument &document) {
-        LOG_INTEGR_TESTS_OR_DEBUG << document;
+        LOG_VERBOSE_OR_DEBUG << document;
         bool anyError = false;
 
         do {
@@ -93,7 +87,8 @@ namespace Connectivity {
             }
 
             QJsonObject rootObject = document.object();
-            parseSwitches(rootObject);
+            parseSwitches(rootObject);            
+            emit switchesUpdated();
         } while (false);
 
         return anyError;
@@ -102,7 +97,7 @@ namespace Connectivity {
     void SwitcherConfig::processRemoteConfig(const QJsonDocument &remoteDocument, bool overwriteLocal) {
         bool overwrite = false;
 
-        LOG_INTEGR_TESTS_OR_DEBUG << remoteDocument;
+        LOG_VERBOSE_OR_DEBUG << remoteDocument;
 
         if (!overwriteLocal && remoteDocument.isObject()) {
             QJsonObject rootObject = remoteDocument.object();
@@ -127,6 +122,7 @@ namespace Connectivity {
 
         if (document.isObject()) {
             parseSwitches(document.object());
+            emit switchesUpdated();
         } else {
             LOG_WARNING << "Remote document is not an object";
         }
@@ -225,6 +221,10 @@ namespace Connectivity {
         SwitchValue directExport;
         SwitchValue qualityVideoPreviews;
         SwitchValue autoImport;
+        SwitchValue gettySuggestion;
+        SwitchValue updateEnabled;
+        SwitchValue keywordsDragDropEnabled;
+        SwitchValue telemetryEnabled;
 
         initSwitchValue(object, DONATE_CAMPAIGN_1_KEY, donateCampaign1Active);
         initSwitchValue(object, DONATE_CAMPAIGN_1_STAGE_2, donateCampaign1Stage2);
@@ -232,6 +232,10 @@ namespace Connectivity {
         initSwitchValue(object, DIRECT_METADATA_EXPORT, directExport);
         initSwitchValue(object, GOOD_QUALITY_VIDEO_PREVIEWS, qualityVideoPreviews);
         initSwitchValue(object, METADATA_AUTO_IMPORT, autoImport);
+        initSwitchValue(object, GETTY_SUGGESTION, gettySuggestion);
+        initSwitchValue(object, UPDATE_ENABLED, updateEnabled);
+        initSwitchValue(object, KEYWORDS_DRAG_DROP_ENABLED, keywordsDragDropEnabled);
+        initSwitchValue(object, TELEMETRY_ENABLED_KEY, telemetryEnabled);
 
         // overwrite these values
         {
@@ -245,10 +249,12 @@ namespace Connectivity {
             m_SwitchesHash[DirectMetadataExport] = directExport;
             m_SwitchesHash[GoodQualityVideoPreviews] = qualityVideoPreviews;
             m_SwitchesHash[MetadataAutoImport] = autoImport;
+            m_SwitchesHash[GettySuggestionEnabled] = gettySuggestion;
+            m_SwitchesHash[UpdateEnabled] = updateEnabled;
+            m_SwitchesHash[KeywordsDragDropEnabled] = keywordsDragDropEnabled;
+            m_SwitchesHash[TelemetryEnabled] = telemetryEnabled;
 
-            LOG_INTEGR_TESTS_OR_DEBUG << m_SwitchesHash;
+            LOG_VERBOSE_OR_DEBUG << m_SwitchesHash;
         }
-
-        emit switchesUpdated();
     }
 }

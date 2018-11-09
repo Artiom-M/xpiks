@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,10 +9,17 @@
  */
 
 #include "secretsmanager.h"
-#include "aes-qt.h"
+
+#include <QChar>
+#include <QCharRef>
 #include <QCryptographicHash>
+#include <QMutexLocker>
 #include <QTime>
-#include "../Common/defines.h"
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Common/logging.h"
+#include "Encryption/aes-qt.h"
 
 void shuffleString(QString &str) {
     qsrand(QTime::currentTime().msec());
@@ -28,8 +35,7 @@ void shuffleString(QString &str) {
 }
 
 namespace Encryption {
-    SecretsManager::SecretsManager():
-        m_CommandManager(NULL)
+    SecretsManager::SecretsManager()
     {
         QString possibleCharacters("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
         shuffleString(possibleCharacters);
@@ -45,7 +51,7 @@ namespace Encryption {
     }
 
     void SecretsManager::setMasterPasswordHash(const QString &hash) {
-        LOG_INTEGRATION_TESTS << hash;
+        LOG_VERBOSE << hash;
         m_MasterPasswordHash = QByteArray::fromHex(hash.toLatin1());
     }
 
@@ -69,7 +75,7 @@ namespace Encryption {
 
         if (!encodedPassword.isEmpty()) {
             QString key = getKeyForEncryption();
-            LOG_INTEGRATION_TESTS << "key:" << key << "pswd:" << encodedPassword;
+            LOG_VERBOSE << "key:" << key << "pswd:" << encodedPassword;
             decodedPassword = decodeText(encodedPassword, key);
         }
 
@@ -103,6 +109,7 @@ namespace Encryption {
     }
 
     void SecretsManager::resetMasterPassword() {
+        LOG_DEBUG <<  "#";
         QString keyForEncryption = getKeyForEncryption();
         emit beforeMasterPasswordChange(keyForEncryption, m_DefaultMasterPassword);
         m_EncodedMasterPassword.clear();

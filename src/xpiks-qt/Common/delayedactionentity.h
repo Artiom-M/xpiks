@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,9 +11,14 @@
 #ifndef DELAYEDACTIONENTITY_H
 #define DELAYEDACTIONENTITY_H
 
-#include "defines.h"
-#include <QtGlobal>
+#include <QDebug>
 #include <QTimerEvent>
+#include <Qt>
+#include <QtGlobal>
+
+#include "Common/logging.h"
+
+class QTimerEvent;
 
 namespace Common {
     class DelayedActionEntity {
@@ -26,15 +31,15 @@ namespace Common {
         { }
 
     protected:
-        void justChanged() {
+        virtual void justChanged() {
             if (m_RestartsCount < m_MaxRestartsCount) {
                 if (m_LastTimerId != -1) {
                     doKillTimer(m_LastTimerId);
-                    LOG_INTEGR_TESTS_OR_DEBUG << "killed timer" << m_LastTimerId;
+                    LOG_VERBOSE_OR_DEBUG << "killed timer" << m_LastTimerId;
                 }
 
                 m_LastTimerId = doStartTimer(m_TimerInterval, Qt::VeryCoarseTimer);
-                LOG_INTEGR_TESTS_OR_DEBUG << "started timer" << m_LastTimerId;
+                LOG_VERBOSE_OR_DEBUG << "started timer" << m_LastTimerId;
                 m_RestartsCount++;
             } else {
                 Q_ASSERT(m_LastTimerId != -1);

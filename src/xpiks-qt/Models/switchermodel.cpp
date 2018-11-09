@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,21 +9,28 @@
  */
 
 #include "switchermodel.h"
-#include <QDir>
+
+#include <QDateTime>
 #include <QUuid>
-#include "../Common/defines.h"
-#include "../Helpers/stringhelper.h"
+#include <Qt>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Common/logging.h"
+#include "Connectivity/switcherconfig.h"
+#include "Helpers/stringhelper.h"
 
 namespace Models {
-#define DONATE_CAMPAIGN1_CLICKED "DonateCampaign1Clicked"
-#define SWITCHER_SESSION_TOKEN "SessionToken"
-#define SWITCHER_SESSION_START "SessionStart"
+#define DONATE_CAMPAIGN1_CLICKED "sonateCampaign1Clicked"
+#define SWITCHER_SESSION_TOKEN "sessionToken"
+#define SWITCHER_SESSION_START "sessionStart"
 #define SWITCHER_TIMER_DELAY 2000
 
-    SwitcherModel::SwitcherModel(QObject *parent):
+    SwitcherModel::SwitcherModel(Common::ISystemEnvironment &environment,
+                                 QObject *parent):
         QObject(parent),
-        Common::BaseEntity(),
-        Common::StatefulEntity("switcher"),
+        m_State("switcher", environment),
+        m_Config(environment),
         // effectively meaning all features are OFF
         m_Threshold(100)
     {
@@ -34,16 +41,11 @@ namespace Models {
         QObject::connect(&m_DelayTimer, &QTimer::timeout, this, &SwitcherModel::onDelayTimer);
     }
 
-    void SwitcherModel::setCommandManager(Commands::CommandManager *commandManager) {
-        Common::BaseEntity::setCommandManager(commandManager);
-        m_Config.setCommandManager(commandManager);
-    }
-
     void SwitcherModel::initialize() {
-        initState();
+        m_State.init();
         ensureSessionTokenValid();
 
-        QString sessionToken = getStateString(SWITCHER_SESSION_TOKEN);
+        QString sessionToken = m_State.getString(SWITCHER_SESSION_TOKEN);
         if (!sessionToken.isEmpty()) {
             quint32 hash = Helpers::switcherHash(sessionToken);
             quint32 threshold = hash % 100;
@@ -56,9 +58,9 @@ namespace Models {
         LOG_INFO << "Current threshold is" << m_Threshold;
     }
 
-    void SwitcherModel::updateConfigs() {
+    void SwitcherModel::updateConfigs(Connectivity::IRequestsService &requestsService) {
         LOG_DEBUG << "#";
-        m_Config.initializeConfigs();
+        m_Config.initializeConfigs(requestsService);
     }
 
     void SwitcherModel::afterInitializedCallback() {
@@ -72,12 +74,19 @@ namespace Models {
         const QDateTime dtNow = QDateTime::currentDateTime();
 
         do {
-            if (!containsState(SWITCHER_SESSION_TOKEN)) {
+            QString token = m_State.getString(SWITCHER_SESSION_TOKEN);
+            if (token.isEmpty()) {
                 LOG_DEBUG << "Token not found in the state config";
                 break;
             }
 
-            const QString sessionStart = getStateString(SWITCHER_SESSION_START);
+            QUuid tokenUuid(token);
+            if (tokenUuid.isNull() || (tokenUuid.version() == QUuid::VerUnknown)) {
+                LOG_DEBUG << "Token has incorrect format";
+                break;
+            }
+
+            const QString sessionStart = m_State.getString(SWITCHER_SESSION_START);
             const QDateTime sessionStartDateTime = QDateTime::fromString(sessionStart, Qt::ISODate);
             if (!sessionStartDateTime.isValid()) {
                 LOG_WARNING << "Cannot parse session start datetime:" << sessionStart;
@@ -89,7 +98,7 @@ namespace Models {
 
             if ((daysPassed < 0) || (daysPassed > 30)) {
                 break;
-            }
+            }            
 
             canKeepToken = true;
         } while (false);
@@ -98,16 +107,16 @@ namespace Models {
             LOG_INFO << "Updating switcher token";
 
             QUuid uuid = QUuid::createUuid();
-            setStateValue(SWITCHER_SESSION_TOKEN, uuid.toString());
+            m_State.setValue(SWITCHER_SESSION_TOKEN, uuid.toString());
             QString dateTimeString = dtNow.toString(Qt::ISODate);
-            setStateValue(SWITCHER_SESSION_START, dateTimeString);
+            m_State.setValue(SWITCHER_SESSION_START, dateTimeString);
 
-            syncState();
+            m_State.sync();
         }
     }
 
     bool SwitcherModel::getDonateCampaign1LinkClicked() const {
-        bool clicked = getStateBool(DONATE_CAMPAIGN1_CLICKED, false);
+        bool clicked = m_State.getBool(DONATE_CAMPAIGN1_CLICKED, false);
         return clicked;
     }
 
@@ -115,11 +124,11 @@ namespace Models {
         LOG_DEBUG << "#";
         if (getDonateCampaign1LinkClicked()) { return; }
 
-        setStateValue(DONATE_CAMPAIGN1_CLICKED, true);
+        m_State.setValue(DONATE_CAMPAIGN1_CLICKED, true);
         emit donateCampaign1LinkClicked();
 
         // save config
-        syncState();
+        m_State.sync();
     }
 
     void SwitcherModel::configUpdated() {

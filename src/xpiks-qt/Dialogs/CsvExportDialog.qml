@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -14,6 +14,7 @@ import QtQuick.Layouts 1.1
 import QtQuick.Dialogs 1.1
 import QtQuick.Controls.Styles 1.1
 import QtGraphicalEffects 1.0
+import xpiks 1.0
 import "../Constants"
 import "../Common.js" as Common;
 import "../Components"
@@ -23,6 +24,7 @@ import "../Constants/UIConfig.js" as UIConfig
 Item {
     id: csvExportComponent
     anchors.fill: parent
+    property variant csvExportModel: dispatcher.getCommandTarget(UICommand.SetupCSVExportForSelected)
     property variant columnsModel: csvExportModel.getColumnsModel()
     property variant propertiesModel: columnsModel.getPropertiesList()
 
@@ -118,8 +120,7 @@ Item {
 
         onAccepted: {
             console.log("CsvExportDialog # You chose: " + exportDirDialog.folder)
-            var path = exportDirDialog.folder.toString().replace(/^(file:\/{2})/,"");
-            csvExportModel.outputDirectory = decodeURIComponent(path);
+            csvExportModel.setOutputDirectory(exportDirDialog.folder)
             csvExportModel.startExport()
         }
 
@@ -181,7 +182,7 @@ Item {
             anchors.bottomMargin: -glowRadius/2
             glowRadius: 4
             spread: 0.0
-            color: uiColors.defaultControlColor
+            color: uiColors.popupGlowColor
             cornerRadius: glowRadius
         }
 
@@ -205,6 +206,7 @@ Item {
 
                 ListView {
                     id: exportPlanModelsListView
+                    objectName: "exportPlanModelsListView"
                     model: csvExportModel
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -214,14 +216,6 @@ Item {
                     anchors.bottomMargin: 10
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
-
-                    add: Transition {
-                        NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 230 }
-                    }
-
-                    remove: Transition {
-                        NumberAnimation { property: "opacity"; to: 0; duration: 230 }
-                    }
 
                     displaced: Transition {
                         NumberAnimation { properties: "x,y"; duration: 230 }
@@ -299,6 +293,8 @@ Item {
                                 height: 14
                                 anchors.verticalCenterOffset: 1
                                 isActive: false
+                                enabled: !issystem
+                                visible: !issystem
                                 disabledColor: uiColors.closeIconInactiveColor
 
                                 onItemClicked: {
@@ -340,6 +336,7 @@ Item {
 
                     StyledBlackButton {
                         id: addExportPlanButton
+                        objectName: "addExportPlanButton"
                         text: i18.n + qsTr("Add new", "csv export plan")
                         width: 210
                         height: 30
@@ -516,20 +513,13 @@ Item {
 
                         ListView {
                             id: columnsListView
+                            objectName: "columnsListView"
                             model: columnsModel
                             clip: columnsScrollbar.visible
                             anchors.fill: parent
                             boundsBehavior: Flickable.StopAtBounds
                             spacing: 10
                             focus: true
-
-                            add: Transition {
-                                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 230 }
-                            }
-
-                            remove: Transition {
-                                NumberAnimation { property: "opacity"; to: 0; duration: 230 }
-                            }
 
                             displaced: Transition {
                                 NumberAnimation { properties: "x,y"; duration: 230 }
@@ -681,6 +671,7 @@ Item {
 
                                 GlyphButton {
                                     id: addColumnButton
+                                    objectName: "addColumnButton"
                                     text: i18.n + qsTr("Add column")
                                     width: 180
                                     height: 30

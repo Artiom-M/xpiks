@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,10 +11,26 @@
 #ifndef UPDATESERVICE_H
 #define UPDATESERVICE_H
 
+#include <QMetaType>
 #include <QObject>
+#include <QString>
+#include <QtDebug>
+
+#include "Common/logging.h"
+#include "Common/statefulentity.h"
+#include "Helpers/constants.h"
+
+namespace Common {
+    class ISystemEnvironment;
+}
 
 namespace Models {
     class SettingsModel;
+    class SwitcherModel;
+}
+
+namespace Maintenance {
+    class MaintenanceService;
 }
 
 namespace Connectivity {
@@ -24,15 +40,42 @@ namespace Connectivity {
     {
         Q_OBJECT
     public:
-        UpdateService(Models::SettingsModel *settingsModel);
+        UpdateService(Common::ISystemEnvironment &environment,
+                      Models::SettingsModel &settingsModel,
+                      Models::SwitcherModel &switcherModel,
+                      Maintenance::MaintenanceService &maintenanceService);
+
+    public:
+        void initialize();
 
     public:
         void startChecking();
         void stopChecking();
 
+    public:
+        void setHaveUpgradeConsent() { m_HaveUpgradeConsent = true; }
+        void tryToUpgradeXpiks();
+        bool getIsUpdateDownloaded() { return !getPathToUpdate().isEmpty(); }
+
     private:
-        void doStartChecking();
+        void doStartChecking(const QString &pathToUpdate);
         void updateSettings();
+
+    private:
+        int getAvailableUpdateVersion() const { return m_State.getInt(Constants::availableUpdateVersion); }
+        QString getPathToUpdate() const { return m_State.getString(Constants::pathToUpdate); }
+
+        void setAvailableUpdateVersion(int version) {
+            LOG_DEBUG << "#";
+            m_State.setValue(Constants::availableUpdateVersion, version);
+            m_State.sync();
+        }
+
+        void setPathToUpdate(QString path) {
+            LOG_DEBUG << "#";
+            m_State.setValue(Constants::pathToUpdate, path);
+            m_State.sync();
+        }
 
     private slots:
         void workerFinished();
@@ -40,18 +83,17 @@ namespace Connectivity {
 
     signals:
         void updateAvailable(QString updateLink);
-        void updateDownloaded(QString pathToUpdate);
+        void updateDownloaded();
         void cancelRequested();
 
     private:
-        void saveUpdateInfo() const;
-
-    private:
+        Common::ISystemEnvironment &m_Environment;
         Connectivity::UpdatesCheckerWorker *m_UpdatesCheckerWorker;
-        Models::SettingsModel *m_SettingsModel;
-        QString m_PathToUpdate;
-        int m_AvailableVersion;
-        volatile bool m_UpdateAvailable;
+        Models::SettingsModel &m_SettingsModel;
+        Models::SwitcherModel &m_SwitcherModel;
+        Maintenance::MaintenanceService &m_MaintenanceService;
+        Common::StatefulEntity m_State;
+        bool m_HaveUpgradeConsent = false;
     };
 }
 

@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,12 +9,15 @@
  */
 
 #include "loghighlighter.h"
+
 #include <QColor>
+#include <QLatin1Literal>
 #include <QtGlobal>
-#include "../QMLExtensions/colorsmodel.h"
+
+#include "QMLExtensions/colorsmodel.h"
 
 namespace Helpers {
-    LogHighlighter::LogHighlighter(QMLExtensions::ColorsModel *colorsModel, QTextDocument *document) :
+    LogHighlighter::LogHighlighter(QMLExtensions::ColorsModel &colorsModel, QTextDocument *document) :
         QSyntaxHighlighter(document),
         m_ColorsModel(colorsModel)
     {
@@ -23,9 +26,9 @@ namespace Helpers {
     void LogHighlighter::highlightBlock(const QString &text) {
         int size = text.size();
 
-        QColor destructiveColor = m_ColorsModel->destructiveColor();
-        QColor artworkModifiedColor = m_ColorsModel->artworkModifiedColor();
-        QColor labelActiveForeground = m_ColorsModel->labelActiveForeground();
+        QColor destructiveColor = m_ColorsModel.destructiveColor();
+        QColor artworkModifiedColor = m_ColorsModel.artworkModifiedColor();
+        QColor labelActiveForeground = m_ColorsModel.labelActiveForeground();
 
         QString word = text.mid(13, 13+8).toLower();
 

@@ -1,7 +1,19 @@
 #include "jsonmerge_tests.h"
+
+#include <QByteArray>
+#include <QDebug>
+#include <QJsonArray>
 #include <QJsonDocument>
-#include "../../xpiks-qt/Helpers/jsonhelper.h"
-#include "../../xpiks-qt/Helpers/comparevaluesjson.h"
+#include <QJsonObject>
+#include <QJsonParseError>
+#include <QJsonValue>
+#include <QJsonValueRef>
+#include <QLatin1String>
+#include <QSet>
+#include <QtGlobal>
+
+#include "Helpers/comparevaluesjson.h"
+#include "Helpers/jsonhelper.h"
 
 struct NameJsonComparer: public Helpers::CompareValuesJson
 {

@@ -2,8 +2,8 @@
 #define FIXSPELLINGTESTS_H
 
 #include <QObject>
-#include <QtTest/QtTest>
-#include "../../xpiks-qt/Common/hold.h"
+#include <QtTest>  // IWYU pragma: keep
+// IWYU pragma: no_include <QString>
 
 class FixSpellingTests: public QObject
 {
@@ -13,13 +13,11 @@ private slots:
     void noReplacementsSelectedTest();
     void fixAndRemoveDuplicatesTest();
     void fixAndRemoveDuplicatesCombinedTest();
+    void fixAndRemoveDuplicatesCombindInArtworksTest();
     void multiReplaceWithCorrectAllTest();
     void replaceWithCorrectDescriptionTest();
     void replaceWithCorrectTitleTest();
     void replaceWithCorrectKeywordsTest();
-
-private:
-    Common::Hold m_FakeHold;
 };
 
 #endif // FIXSPELLINGTESTS_H

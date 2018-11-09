@@ -1,7 +1,9 @@
 #ifndef ARTWORKREPOSITORYTESTS_H
 #define ARTWORKREPOSITORYTESTS_H
 
-#include <QtTest/QTest>
+#include <QObject>
+#include <QtTest>  // IWYU pragma: keep
+// IWYU pragma: no_include <QString>
 
 class ArtworkRepositoryTests : public QObject
 {
@@ -17,11 +19,11 @@ private slots:
     void newFilesCountTest();
     void noNewDirectoriesCountTest();
     void noNewFilesCountTest();
-    void endAccountingWithNoNewFilesTest();
-    void startAccountingNewFilesEmitsTest();
+    void accountFileEmitsTest();
     void selectFolderTest();
     void oneEmptyDirectoryStaysTest();
     void fewEmptyDirectoriesStayTest();
+    void removeDirectoryWithHighIDNumberTest();
     // selection tests
     void allDirsInitiallySelectedTest();
     void unselectOneSelectsOnlyOneTest();

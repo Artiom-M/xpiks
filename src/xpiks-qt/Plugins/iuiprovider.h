@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -10,22 +10,21 @@
 #ifndef IUIPROVIDER_H
 #define IUIPROVIDER_H
 
-#include <QUrl>
 #include <QHash>
-#include <QObject>
 #include <QString>
-#include <memory>
-#include "../QuickBuffer/icurrenteditable.h"
+
+class QObject;
+class QUrl;
 
 namespace Plugins {
     class IUIProvider {
     public:
-        virtual ~IUIProvider() {}
+        virtual ~IUIProvider() { }
 
-        virtual void openDialog(const QUrl &rcPath, const QHash<QString, QObject*> &contextModels = QHash<QString, QObject*>()) const = 0;
+        virtual void openDialog(const QUrl &rcPath,
+                                const QHash<QString, QObject*> &contextModels = QHash<QString, QObject*>()) const = 0;
         virtual int addTab(const QString &tabIconUrl, const QString &tabComponentUrl, QObject *tabModel) const = 0;
         virtual bool removeTab(int tabID) const = 0;
-        virtual std::shared_ptr<QuickBuffer::ICurrentEditable> getCurrentEditable() const = 0;
     };
 }
 

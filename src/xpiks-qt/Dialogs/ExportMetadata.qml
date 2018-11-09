@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -14,6 +14,7 @@ import QtQuick.Layouts 1.1
 import QtQuick.Dialogs 1.1
 import QtQuick.Controls.Styles 1.1
 import QtGraphicalEffects 1.0
+import xpiks 1.0
 import "../Constants"
 import "../Common.js" as Common;
 import "../Components"
@@ -43,7 +44,7 @@ Item {
     MessageDialog {
         id: errorsNotification
         title: i18.n + qsTr("Warning")
-        text: i18.n + qsTr("Export finished with errors. See logs for details.")
+        text: i18.n + qsTr("Action finished with errors. See logs for details.")
 
         onAccepted: {
             closePopup()
@@ -108,7 +109,7 @@ Item {
             anchors.bottomMargin: -glowRadius/2
             glowRadius: 4
             spread: 0.0
-            color: uiColors.defaultControlColor
+            color: uiColors.popupGlowColor
             cornerRadius: glowRadius
         }
 
@@ -157,7 +158,7 @@ Item {
 
                     StyledText {
                         anchors.right: parent.right
-                        text: i18.n + qsTr("%1 modified artwork(s) selected").arg(filteredArtItemsModel.getModifiedSelectedCount(overwriteAll))
+                        text: i18.n + qsTr("%1 modified artwork(s) selected").arg(filteredArtworksListModel.getModifiedSelectedCount(overwriteAll))
                         color: uiColors.inputForegroundColor
                     }
                 }
@@ -173,9 +174,8 @@ Item {
                 StyledCheckbox {
                     id: useBackupsCheckbox
                     text: i18.n + qsTr("Backup each file")
-                    checked: true
-                    enabled: settingsModel.useExifTool && !metadataExportComponent.isInProgress
-                    visible: settingsModel.useExifTool
+                    checked: false
+                    enabled: !metadataExportComponent.isInProgress
                 }
 
                 RowLayout {
@@ -195,7 +195,9 @@ Item {
                             spinner.height = spinner.width
                             dialogWindow.height += spinner.height + column.spacing
                             spinner.running = true
-                            filteredArtItemsModel.saveSelectedArtworks(overwriteAll, useBackupsCheckbox.checked)
+
+                            dispatcher.dispatch(UICommand.SetupExportMetadata,
+                                                { overwrite: overwriteAll, backup: useBackupsCheckbox.checked })
                         }
 
                         Connections {

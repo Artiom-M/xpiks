@@ -11,44 +11,42 @@
 #ifndef CONECTIVITYHELPERS_H
 #define CONECTIVITYHELPERS_H
 
-#include <QStringList>
-#include <QVector>
 #include <memory>
 #include <vector>
-#include "uploadcontext.h"
 
-namespace Models {
-    class ArtworkMetadata;
-    class UploadInfo;
-    class ProxySettings;
-    class SettingsModel;
+class QStringList;
+
+namespace Artworks {
+    class ArtworksSnapshot;
 }
 
 namespace Encryption {
     class SecretsManager;
 }
 
-namespace MetadataIO {
-    class ArtworksSnapshot;
+namespace Models {
+    class SettingsModel;
+    class UploadInfo;
 }
 
 namespace libxpks {
     namespace net {
         class UploadBatch;
+        class UploadContext;
 
-        void extractFilePathes(const MetadataIO::ArtworksSnapshot &artworksSnapshot,
+        void extractFilePathes(const Artworks::ArtworksSnapshot &artworksSnapshot,
                                QStringList &filePathes,
                                QStringList &zipsPathes);
 
         void generateUploadContexts(const std::vector<std::shared_ptr<Models::UploadInfo> > &uploadInfos,
                                     std::vector<std::shared_ptr<UploadContext> > &contexts,
-                                    Encryption::SecretsManager *secretsManager,
-                                    Models::SettingsModel *settingsModel);
+                                    Encryption::SecretsManager &secretsManager,
+                                    Models::SettingsModel &settingsModel);
 
-        std::vector<std::shared_ptr<UploadBatch> > generateUploadBatches(const MetadataIO::ArtworksSnapshot &artworksToUpload,
+        std::vector<std::shared_ptr<UploadBatch> > generateUploadBatches(const Artworks::ArtworksSnapshot &artworksToUpload,
                                                                          const std::vector<std::shared_ptr<Models::UploadInfo> > &uploadInfos,
-                                                                         Encryption::SecretsManager *secretsManager,
-                                                                         Models::SettingsModel *settingsModel);
+                                                                         Encryption::SecretsManager &secretsManager,
+                                                                         Models::SettingsModel &settingsModel);
     }
 }
 

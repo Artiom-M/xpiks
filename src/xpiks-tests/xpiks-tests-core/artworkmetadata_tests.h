@@ -2,7 +2,8 @@
 #define ARTWORKMETADATA_TESTS_H
 
 #include <QObject>
-#include <QtTest/QtTest>
+#include <QtTest>  // IWYU pragma: keep
+// IWYU pragma: no_include <QString>
 
 class ArtworkMetadataTests: public QObject
 {
@@ -46,6 +47,13 @@ private slots:
     void clearKeywordsMarksAsModifiedTest();
     void clearEmptyKeywordsDoesNotMarkModifiedTest();
     void removeKeywordsMarksModifiedTest();
+    void swapKeywordsBasicTest();
+    void dontSwapKeywordsTest();
+    void moveKeywordForwardTest();
+    void moveBackToFrontTest();
+    void moveFrontToBackTest();
+    void moveMiddleToBackTest();
+    void moveSameSpotTest();
 };
 
 #endif // ARTWORKMETADATA_TESTS_H

@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -12,14 +12,22 @@
 #define SWITCHERMODEL_H
 
 #include <QObject>
+#include <QString>
 #include <QTimer>
-#include "../Connectivity/switcherconfig.h"
-#include "../Helpers/localconfig.h"
-#include "../Common/baseentity.h"
-#include "../Common/statefulentity.h"
+
+#include "Common/statefulentity.h"
+#include "Connectivity/switcherconfig.h"
+
+namespace Common {
+    class ISystemEnvironment;
+}
+
+namespace Connectivity {
+    class IRequestsService;
+}
 
 namespace Models {
-    class SwitcherModel: public QObject, public Common::BaseEntity, public Common::StatefulEntity
+    class SwitcherModel: public QObject
     {
         Q_OBJECT
         Q_PROPERTY(bool isDonationCampaign1Active READ getIsDonationCampaign1On NOTIFY switchesUpdated)
@@ -27,15 +35,14 @@ namespace Models {
         Q_PROPERTY(bool isDonateCampaign1LinkClicked READ getDonateCampaign1LinkClicked NOTIFY donateCampaign1LinkClicked)
         Q_PROPERTY(bool isDonateCampaign1Stage2On READ getIsDonateCampaign1Stage2On NOTIFY switchesUpdated)
         Q_PROPERTY(bool useAutoImport READ getUseAutoImport NOTIFY switchesUpdated)
+        Q_PROPERTY(bool keywordsDragDropEnabled READ getKeywordsDragDropEnabled NOTIFY switchesUpdated)
     public:
-        SwitcherModel(QObject *parent=nullptr);
-
-    public:
-        virtual void setCommandManager(Commands::CommandManager *commandManager) override;
+        SwitcherModel(Common::ISystemEnvironment &environment,
+                      QObject *parent=nullptr);
 
     public:
         void initialize();
-        void updateConfigs();
+        void updateConfigs(Connectivity::IRequestsService &requestsService);
         void afterInitializedCallback();
 
     private:
@@ -48,12 +55,16 @@ namespace Models {
         bool getUseDirectMetadataExport() { return m_Config.isSwitchOn(Connectivity::SwitcherConfig::DirectMetadataExport, m_Threshold); }
         bool getGoodQualityVideoPreviews() { return m_Config.isSwitchOn(Connectivity::SwitcherConfig::GoodQualityVideoPreviews, m_Threshold); }
         bool getUseAutoImport() { return m_Config.isSwitchOn(Connectivity::SwitcherConfig::MetadataAutoImport, m_Threshold); }
+        bool getGettySuggestionEnabled() { return m_Config.isSwitchOn(Connectivity::SwitcherConfig::GettySuggestionEnabled, m_Threshold); }
+        bool getUpdateEnabled() { return m_Config.isSwitchOn(Connectivity::SwitcherConfig::UpdateEnabled, m_Threshold); }
+        bool getKeywordsDragDropEnabled() { return m_Config.isSwitchOn(Connectivity::SwitcherConfig::KeywordsDragDropEnabled, m_Threshold); }
+        bool getIsTelemetryEnabled() { return m_Config.isSwitchOn(Connectivity::SwitcherConfig::TelemetryEnabled, m_Threshold); }
 
     public:
         bool getDonateCampaign1LinkClicked() const;
-        QString getDonateCampaign1Link() const { return QString("https://ribtoks.github.io/xpiks/donatecampaign/"); }
+        QString getDonateCampaign1Link() const { return QString("https://xpiksapp.com/donatecampaign/"); }
 
-#ifdef INTEGRATION_TESTS
+#if defined(INTEGRATION_TESTS) || defined(UI_TESTS)
     public:
         void setRemoteConfigOverride(const QString &localPath) { m_Config.setRemoteOverride(localPath); }
 #endif
@@ -74,6 +85,7 @@ namespace Models {
         void readEngagementConfig();
 
     private:
+        Common::StatefulEntity m_State;
         QTimer m_DelayTimer;
         Connectivity::SwitcherConfig m_Config;
         int m_Threshold;

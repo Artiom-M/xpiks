@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -14,6 +14,7 @@ import QtQuick.Controls 1.1
 import QtQuick.Controls.Styles 1.1
 import QtQuick.Layouts 1.1
 import QtGraphicalEffects 1.0
+import xpiks 1.0
 import "../Constants"
 import "../Common.js" as Common;
 import "../Components"
@@ -24,8 +25,8 @@ Item {
     id: failedUploadsComponent
     anchors.fill: parent
 
-    property var artworkUploader: helpersWrapper.getArtworkUploader()
-    property var uploadWatcher: artworkUploader.getUploadWatcher()
+    property var artworksUploader: dispatcher.getCommandTarget(UICommand.SetupUpload)
+    property var uploadWatcher: artworksUploader.getUploadWatcher()
 
     signal dialogDestruction();
     Component.onDestruction: dialogDestruction();
@@ -89,7 +90,7 @@ Item {
             anchors.bottomMargin: -glowRadius/2
             glowRadius: 4
             spread: 0.0
-            color: uiColors.defaultControlColor
+            color: uiColors.popupGlowColor
             cornerRadius: glowRadius
         }
 
@@ -179,7 +180,7 @@ Item {
 
                                 StyledText {
                                     id: hostAddress
-                                    text: artworkUploader.getFtpName(ftpaddress)
+                                    text: artworksUploader.getFtpName(ftpaddress)
                                     color: uiColors.artworkActiveColor
                                     //font.bold: true
                                     font.pixelSize: UIConfig.fontPixelSize + 4
@@ -234,17 +235,25 @@ Item {
                                                 cache: false
                                             }
 
-                                            Image {
-                                                id: imageTypeIcon
-                                                property bool isVector: helpersWrapper.isVector(imageItem.delegateData)
-                                                visible: isVector
-                                                enabled: isVector
-                                                source: "qrc:/Graphics/vector-icon.svg"
-                                                sourceSize.width: 20
-                                                sourceSize.height: 20
+                                            Rectangle {
                                                 anchors.left: artworkImage.left
                                                 anchors.bottom: artworkImage.bottom
-                                                cache: true
+                                                width: 20
+                                                height: 20
+                                                color: uiColors.defaultDarkColor
+                                                property bool isVideo: helpersWrapper.isVideo(imageItem.delegateData)
+                                                property bool isVector: helpersWrapper.isVector(imageItem.delegateData)
+                                                visible: isVideo || isVector
+                                                enabled: isVideo || isVector
+
+                                                Image {
+                                                    id: typeIcon
+                                                    anchors.fill: parent
+                                                    source: parent.isVector ? "qrc:/Graphics/vector-icon.svg" : (parent.isVideo ? "qrc:/Graphics/video-icon.svg" : "")
+                                                    sourceSize.width: 20
+                                                    sourceSize.height: 20
+                                                    cache: true
+                                                }
                                             }
                                         }
 

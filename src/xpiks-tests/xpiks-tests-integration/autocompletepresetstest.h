@@ -6,8 +6,8 @@
 class AutoCompletePresetsTest : public IntegrationTestBase
 {
 public:
-    AutoCompletePresetsTest(Commands::CommandManager *commandManager):
-        IntegrationTestBase(commandManager)
+    AutoCompletePresetsTest(IntegrationTestsEnvironment &environment, XpiksTestsApp &testsApp):
+        IntegrationTestBase(environment, testsApp)
     {}
 
     // IntegrationTestBase interface

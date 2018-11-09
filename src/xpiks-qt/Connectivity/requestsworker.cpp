@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,11 +9,27 @@
  */
 
 #include "requestsworker.h"
-#include "simplecurlrequest.h"
+
+#include <QStringList>
+#include <QtDebug>
+
+#include "Common/flags.h"
+#include "Common/logging.h"
+#include "Common/types.h"
+#include "Connectivity/iconnectivityrequest.h"
+#include "Connectivity/iconnectivityresponse.h"
+#include "Connectivity/simplecurlrequest.h"
 
 namespace Connectivity {
-    RequestsWorker::RequestsWorker(QObject *parent) : QObject(parent)
+    RequestsWorker::RequestsWorker(const Models::ProxySettings &proxySettings, QObject *parent) :
+        QObject(parent),
+        m_ProxySettings(proxySettings)
     {
+    }
+
+    void RequestsWorker::sendRequestSync(std::shared_ptr<IConnectivityRequest> &item) {
+        LOG_DEBUG << "#";
+        sendRequest(item);
     }
 
     bool RequestsWorker::initWorker() {
@@ -21,22 +37,25 @@ namespace Connectivity {
         return true;
     }
 
-    void RequestsWorker::processOneItem(std::shared_ptr<ConnectivityRequest> &item) {
-        auto &url = item->getURL();
+    void RequestsWorker::sendRequest(std::shared_ptr<IConnectivityRequest> &item) {
+        auto url = item->getResourceURL();
         LOG_INFO << "Request:" << url;
 
         SimpleCurlRequest request(url);
-        request.setProxySettings(item->getProxySettings());
+        request.setProxySettings(&m_ProxySettings);
+        request.addRawHeaders(item->getRawHeaders());
 
-        if (item->getNoCache()) {
-            request.setRawHeaders(QStringList() << "Cache-Control: no-cache");
+        Common::flag_t flags = item->getFlags();
+        if (Common::HasFlag(flags, IConnectivityRequest::NoCache)) {
+            request.addRawHeaders(QStringList() << "Cache-Control: no-cache");
         }
 
-        bool success = request.sendRequestSync();
-        if (success) {
-            item->setResponse(request.getResponseData());
-        } else {
-            LOG_WARNING << "Failed to get" << url;
+        const bool success = request.sendRequestSync();
+        if (!success) { LOG_WARNING << "Failed to process" << url; }
+
+        IConnectivityResponse *response = item->getResponse();
+        if (response != nullptr) {
+            response->setResult(success, request.getResponseData());
         }
     }
 }

@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,32 +9,37 @@
  */
 
 #include "simplecurlrequest.h"
-#include <curl/curl.h>
+
 #include <string>
 #include <cstring>
 #include <cstdlib>
-#include "../Models/proxysettings.h"
-#include "../Common/defines.h"
-#include "ftphelpers.h"
+
+#include <QtDebug>
+#include <QtGlobal>
+
+#include <curl/curl.h>
+
+#include "Common/logging.h"
+#include "Connectivity/ftphelpers.h"
 
 struct MemoryStruct {
-    char *memory;
-    size_t size;
+    char *m_Memory;
+    size_t m_Size;
 };
 
 static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     size_t realsize = size * nmemb;
     MemoryStruct *mem = (MemoryStruct *)userp;
 
-    mem->memory = (char *)realloc(mem->memory, mem->size + realsize + 1);
-    if(mem->memory == NULL) {
+    mem->m_Memory = (char *)realloc(mem->m_Memory, mem->m_Size + realsize + 1);
+    if(mem->m_Memory == NULL) {
         /* out of memory! */
         return 0;
     }
 
-    memcpy(&(mem->memory[mem->size]), contents, realsize);
-    mem->size += realsize;
-    mem->memory[mem->size] = 0;
+    memcpy(&(mem->m_Memory[mem->m_Size]), contents, realsize);
+    mem->m_Size += realsize;
+    mem->m_Memory[mem->m_Size] = 0;
 
     return realsize;
 }
@@ -52,11 +57,11 @@ namespace Connectivity {
         return doRequest();
     }
 
-    void SimpleCurlRequest::setRawHeaders(const QStringList &headers) {
-        m_RawHeaders = headers;
+    void SimpleCurlRequest::addRawHeaders(const QStringList &headers) {
+        m_RawHeaders.append(headers);
     }
 
-    void SimpleCurlRequest::setProxySettings(Models::ProxySettings *proxySettings) {
+    void SimpleCurlRequest::setProxySettings(const Models::ProxySettings *proxySettings) {
         m_ProxySettings = proxySettings;
     }
 
@@ -71,8 +76,8 @@ namespace Connectivity {
         CURLcode res;
 
         MemoryStruct chunk;
-        chunk.memory = nullptr;
-        chunk.size = 0;
+        chunk.m_Memory = nullptr;
+        chunk.m_Size = 0;
 
         struct curl_slist *curl_headers = NULL;
 
@@ -151,8 +156,8 @@ namespace Connectivity {
              * Do something nice with it!
              */
 
-            LOG_INFO << chunk.size << "bytes received";
-            m_ResponseData = QByteArray(chunk.memory, (uint)chunk.size);
+            LOG_INFO << chunk.m_Size << "bytes received";
+            m_ResponseData = QByteArray(chunk.m_Memory, (uint)chunk.m_Size);
         }
 
         /* cleanup curl stuff */
@@ -163,7 +168,7 @@ namespace Connectivity {
             curl_slist_free_all(curl_headers);
         }
 
-        free(chunk.memory);
+        free(chunk.m_Memory);
 
         return success;
     }

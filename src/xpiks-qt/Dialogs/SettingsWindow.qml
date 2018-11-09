@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -34,10 +34,7 @@ ApplicationWindow {
     signal dialogDestruction();
     signal refreshProxy();
 
-    onClosing: {
-        saveSettings()
-        dialogDestruction();
-    }
+    onClosing: dialogDestruction()
 
     function closeSettings() {
         settingsWindow.close()
@@ -112,27 +109,7 @@ ApplicationWindow {
 
         onAccepted: {
             console.log("UI:SettingsWindow # You chose: " + exifToolFileDialog.fileUrl)
-            var path = exifToolFileDialog.fileUrl.toString().replace(/^(file:\/{3})/,"");
-            settingsModel.exifToolPath = decodeURIComponent(path);
-        }
-
-        onRejected: {
-            console.log("UI:SettingsWindow # File dialog canceled")
-        }
-    }
-
-    FileDialog {
-        id: dictPathDialog
-        title: "Please choose dictionaries location"
-        selectExisting: true
-        selectMultiple: false
-        selectFolder: true
-        nameFilters: [ "All files (*)" ]
-
-        onAccepted: {
-            console.log("UI:SettingsWindow # You chose: " + dictPathDialog.folder)
-            var path = dictPathDialog.folder.toString().replace(/^(file:\/{2})/,"");
-            settingsModel.dictionaryPath = decodeURIComponent(path);
+            settingsModel.setExifTool(exifToolFileDialog.fileUrl)
         }
 
         onRejected: {
@@ -240,14 +217,6 @@ ApplicationWindow {
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
 
-                add: Transition {
-                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 230 }
-                }
-
-                remove: Transition {
-                    NumberAnimation { property: "opacity"; to: 0; duration: 230 }
-                }
-
                 displaced: Transition {
                     NumberAnimation { properties: "x,y"; duration: 230 }
                 }
@@ -258,10 +227,6 @@ ApplicationWindow {
 
                 removeDisplaced: Transition {
                     NumberAnimation { properties: "x,y"; duration: 230 }
-                }
-
-                onCurrentIndexChanged: {
-                    //csvExportModel.setCurrentItem(tabNamesListView.currentIndex)
                 }
 
                 delegate: Rectangle {
@@ -351,7 +316,7 @@ ApplicationWindow {
 
                     Connections {
                         target: settingsModel
-                        onSettingsReset: { resetRequested() }
+                        onSettingsReset: { behaviorTab.resetRequested() }
                     }
 
                     ColumnLayout {
@@ -374,30 +339,6 @@ ApplicationWindow {
                                     anchors.left: parent.left
                                     anchors.leftMargin: 10
                                     anchors.verticalCenter: parent.verticalCenter
-                                    id: autoDuplicateSearchCheckbox
-                                    text: i18.n + qsTr("Detect duplicates automatically")
-                                    onCheckedChanged: {
-                                        settingsModel.detectDuplicates = checked
-                                    }
-                                    function onResetRequested() {
-                                        checked = settingsModel.detectDuplicates
-                                    }
-
-                                    Component.onCompleted: {
-                                        checked = settingsModel.detectDuplicates
-                                        behaviorTab.resetRequested.connect(autoDuplicateSearchCheckbox.onResetRequested)
-                                    }
-                                }
-                            }
-
-                            Item {
-                                width: parent.itemWidth
-                                height: parent.itemHeight
-
-                                StyledCheckbox {
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 10
-                                    anchors.verticalCenter: parent.verticalCenter
                                     id: autoSpellCheckCheckbox
                                     text: i18.n + qsTr("Check spelling automatically")
                                     onCheckedChanged: {
@@ -410,6 +351,30 @@ ApplicationWindow {
                                     Component.onCompleted: {
                                         checked = settingsModel.useSpellCheck
                                         behaviorTab.resetRequested.connect(autoSpellCheckCheckbox.onResetRequested)
+                                    }
+                                }
+                            }
+
+                            Item {
+                                width: parent.itemWidth
+                                height: parent.itemHeight
+
+                                StyledCheckbox {
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 10
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    id: autoDuplicateSearchCheckbox
+                                    text: i18.n + qsTr("Detect duplicates automatically")
+                                    onCheckedChanged: {
+                                        settingsModel.detectDuplicates = checked
+                                    }
+                                    function onResetRequested() {
+                                        checked = settingsModel.detectDuplicates
+                                    }
+
+                                    Component.onCompleted: {
+                                        checked = settingsModel.detectDuplicates
+                                        behaviorTab.resetRequested.connect(autoDuplicateSearchCheckbox.onResetRequested)
                                     }
                                 }
                             }
@@ -550,7 +515,7 @@ ApplicationWindow {
 
                     Connections {
                         target: settingsModel
-                        onSettingsReset: { resetRequested() }
+                        onSettingsReset: { uxTab.resetRequested() }
                     }
 
                     ColumnLayout {
@@ -758,36 +723,37 @@ ApplicationWindow {
                                 text: i18.n + qsTr("Undo dismiss duration:")
                             }
 
-                            Rectangle {
-                                color: enabled ? uiColors.inputBackgroundColor : uiColors.inputInactiveBackground
-                                border.color: uiColors.artworkActiveColor
-                                border.width: dismissDuration.activeFocus ? 1 : 0
-                                width: 115
-                                height: UIConfig.textInputHeight
-                                clip: true
+                            ComboBoxPopup {
+                                id: undoDurationComboBox
+                                model: [10, 20, 30, 40, 50, 60]
+                                showColorSign: false
+                                width: 130
+                                height: 24
+                                itemHeight: 28
+                                dropDownWidth: 130
+                                glowEnabled: true
+                                glowTopMargin: 2
+                                globalParent: globalHost
 
-                                StyledTextInput {
-                                    id: dismissDuration
-                                    text: settingsModel.dismissDuration
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.leftMargin: 5
-                                    anchors.rightMargin: 5
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    onTextChanged: {
-                                        if (text.length > 0) {
-                                            settingsModel.dismissDuration = parseInt(text)
-                                        }
-                                    }
+                                onComboItemSelected: {
+                                    var index = undoDurationComboBox.selectedIndex;
+                                    var value = undoDurationComboBox.model[index]
+                                    settingsModel.dismissDuration = parseInt(value)
+                                }
 
-                                    function onResetRequested() {
-                                        text = settingsModel.dismissDuration
-                                    }
+                                function setValue(value, defaultIndex) {
+                                    var index = undoDurationComboBox.model.indexOf(value)
+                                    if (index === -1) { index = defaultIndex }
+                                    selectedIndex = index
+                                }
 
-                                    validator: IntValidator {
-                                        bottom: 1
-                                        top: 100
-                                    }
+                                function onResetRequested() {
+                                    setValue(settingsModel.dismissDuration, 2)
+                                }
+
+                                Component.onCompleted: {
+                                    setValue(settingsModel.dismissDuration, 2)
+                                    uxTab.resetRequested.connect(undoDurationComboBox.onResetRequested)
                                 }
                             }
 
@@ -811,7 +777,7 @@ ApplicationWindow {
 
                     Connections {
                         target: settingsModel
-                        onSettingsReset: { resetRequested() }
+                        onSettingsReset: { extTab.resetRequested() }
                     }
 
                     ColumnLayout {
@@ -822,28 +788,8 @@ ApplicationWindow {
                         anchors.bottomMargin: 10
                         spacing: 0
 
-                        StyledCheckbox {
-                            id: useExifToolCheckbox
-                            text: i18.n + qsTr("Use ExifTool")
-                            onCheckedChanged: {
-                                settingsModel.useExifTool = checked
-                            }
-                            function onResetRequested() {
-                                checked = settingsModel.useExifTool
-                            }
-                            Component.onCompleted: {
-                                checked = settingsModel.useExifTool
-                                extTab.resetRequested.connect(useExifToolCheckbox.onResetRequested)
-                            }
-                        }
-
-                        Item {
-                            height: 20
-                        }
-
                         StyledText {
-                            enabled: settingsModel.useExifTool
-                            isActive: useExifToolCheckbox.checked
+                            isActive: true
                             text: i18.n + qsTr("ExifTool path:")
                         }
 
@@ -863,7 +809,6 @@ ApplicationWindow {
                                 Layout.fillWidth: true
                                 height: UIConfig.textInputHeight
                                 clip: true
-                                enabled: settingsModel.useExifTool
 
                                 StyledTextInput {
                                     id: exifToolText
@@ -889,14 +834,12 @@ ApplicationWindow {
                                 text: i18.n + qsTr("Select...")
                                 width: 100
                                 onClicked: exifToolFileDialog.open()
-                                enabled: settingsModel.useExifTool
                             }
 
                             StyledButton {
                                 text: i18.n + qsTr("Reset")
                                 width: 100
                                 onClicked: settingsModel.resetExifTool()
-                                enabled: settingsModel.useExifTool
                             }
                         }
 
@@ -915,80 +858,6 @@ ApplicationWindow {
 
                         Item {
                             height: 20
-                        }
-
-                        StyledText {
-                            text: i18.n + qsTr("Dictionary path:")
-                            enabled: Qt.platform.os === "linux"
-                            visible: enabled
-                        }
-
-                        Item {
-                            height: 10
-                            enabled: Qt.platform.os === "linux"
-                            visible: enabled
-                        }
-
-                        RowLayout {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            spacing: 20
-                            enabled: Qt.platform.os === "linux"
-                            visible: enabled
-
-                            Rectangle {
-                                color: enabled ? uiColors.inputBackgroundColor : uiColors.inputInactiveBackground
-                                border.color: uiColors.artworkActiveColor
-                                border.width: dictText.activeFocus ? 1 : 0
-                                Layout.fillWidth: true
-                                height: UIConfig.textInputHeight
-                                clip: true
-
-                                StyledTextInput {
-                                    id: dictText
-                                    text: settingsModel.dictionaryPath
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.leftMargin: 5
-                                    anchors.rightMargin: 5
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    onTextChanged: settingsModel.dictionaryPath = text
-                                }
-                            }
-
-                            StyledButton {
-                                text: i18.n + qsTr("Select...")
-                                width: 100
-                                onClicked: dictPathDialog.open()
-                            }
-
-                            StyledButton {
-                                text: i18.n + qsTr("Reset")
-                                width: 100
-                                onClicked: settingsModel.resetDictPath()
-                            }
-                        }
-
-                        Item {
-                            height: 20
-                            enabled: Qt.platform.os === "linux"
-                            visible: enabled
-                        }
-
-                        Rectangle {
-                            height: 1
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.leftMargin: 10
-                            anchors.rightMargin: 10
-                            color: uiColors.panelSelectedColor
-                            enabled: Qt.platform.os === "linux"
-                            visible: enabled
-                        }
-
-                        Item {
-                            height: 20
-                            enabled: Qt.platform.os === "linux"
                             visible: enabled
                         }
 
@@ -996,8 +865,8 @@ ApplicationWindow {
                             width: 200
                             text: i18.n + qsTr("Manage user dictionary")
                             onClicked: {
-                                userDictEditModel.initializeModel()
-                                Common.launchDialog("../Dialogs/UserDictEditDialog.qml",
+                                dispatcher.dispatch(UICommand.InitUserDictionary, {})
+                                Common.launchDialog("Dialogs/UserDictEditDialog.qml",
                                                     settingsWindow,
                                                     {
                                                         componentParent: settingsWindow
@@ -1019,7 +888,7 @@ ApplicationWindow {
 
                     Connections {
                         target: settingsModel
-                        onSettingsReset: { resetRequested() }
+                        onSettingsReset: { uploadTab.resetRequested() }
                     }
 
                     ColumnLayout {
@@ -1044,7 +913,7 @@ ApplicationWindow {
                                 color: enabled ? uiColors.inputBackgroundColor : uiColors.inputInactiveBackground
                                 border.width: timeoutSeconds.activeFocus ? 1 : 0
                                 border.color: uiColors.artworkActiveColor
-                                width: 115
+                                width: 130
                                 height: UIConfig.textInputHeight
                                 clip: true
 
@@ -1070,7 +939,7 @@ ApplicationWindow {
                                         uploadTab.resetRequested.connect(timeoutSeconds.onResetRequested)
                                     }
 
-                                    KeyNavigation.tab: maxParallelUploads
+                                    //KeyNavigation.tab: maxParallelUploads
                                     validator: IntValidator {
                                         bottom: 0
                                         top: 300
@@ -1094,40 +963,37 @@ ApplicationWindow {
                                 text: i18.n + qsTr("Max parallel uploads:")
                             }
 
-                            Rectangle {
-                                color: enabled ? uiColors.inputBackgroundColor : uiColors.inputInactiveBackground
-                                border.width: maxParallelUploads.activeFocus ? 1 : 0
-                                border.color: uiColors.artworkActiveColor
-                                width: 115
-                                height: UIConfig.textInputHeight
-                                clip: true
+                            ComboBoxPopup {
+                                id: parallelUploadsComboBox
+                                model: [1, 2, 3, 4]
+                                showColorSign: false
+                                width: 130
+                                height: 24
+                                itemHeight: 28
+                                dropDownWidth: 130
+                                glowEnabled: true
+                                glowTopMargin: 2
+                                globalParent: globalHost
 
-                                StyledTextInput {
-                                    id: maxParallelUploads
-                                    text: settingsModel.maxParallelUploads
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.leftMargin: 5
-                                    anchors.rightMargin: 5
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    onTextChanged: {
-                                        if (text.length > 0) {
-                                            settingsModel.maxParallelUploads = parseInt(text)
-                                        }
-                                    }
+                                onComboItemSelected: {
+                                    var index = parallelUploadsComboBox.selectedIndex;
+                                    var value = parallelUploadsComboBox.model[index]
+                                    settingsModel.maxParallelUploads = parseInt(value)
+                                }
 
-                                    function onResetRequested() {
-                                        text = settingsModel.maxParallelUploads
-                                    }
+                                function onResetRequested() {
+                                    setValue(settingsModel.maxParallelUploads, 1)
+                                }
 
-                                    Component.onCompleted: {
-                                        uploadTab.resetRequested.connect(maxParallelUploads.onResetRequested)
-                                    }
-                                    KeyNavigation.backtab: timeoutSeconds
-                                    validator: IntValidator {
-                                        bottom: 1
-                                        top: 4
-                                    }
+                                function setValue(value, defaultIndex) {
+                                    var index = parallelUploadsComboBox.model.indexOf(value)
+                                    if (index === -1) { index = defaultIndex }
+                                    selectedIndex = index
+                                }
+
+                                Component.onCompleted: {
+                                    setValue(settingsModel.maxParallelUploads, 1)
+                                    uploadTab.resetRequested.connect(parallelUploadsComboBox.onResetRequested)
                                 }
                             }
 
@@ -1209,7 +1075,7 @@ ApplicationWindow {
 
                     Connections {
                         target: settingsModel
-                        onSettingsReset: { resetRequested() }
+                        onSettingsReset: { secTab.resetRequested() }
                     }
 
                     ColumnLayout {
@@ -1585,8 +1451,8 @@ ApplicationWindow {
                 }
 
                 StyledButton {
-                    text: i18.n + qsTr("Save and close")
-                    width: 150
+                    text: i18.n + qsTr("Close")
+                    width: 100
                     onClicked: {
                         saveSettings()
                         closeSettings()

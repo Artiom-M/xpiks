@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -62,7 +62,7 @@ ApplicationWindow {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: i18.n + qsTr("<u>Xpiks webpage</u>")
                 onClicked: {
-                    Qt.openUrlExternally("https://ribtoks.github.io/xpiks/")
+                    Qt.openUrlExternally("https://xpiksapp.com/")
                 }
             }
 
@@ -80,7 +80,7 @@ ApplicationWindow {
                     wrapMode: TextEdit.Wrap
                     anchors.fill: parent
                     horizontalAlignment: Text.AlignHCenter
-                    text: i18.n + qsTr("The program is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE")
+                    /*ignorestyle*/text: i18.n + qsTr("The program is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE")
                 }
             }
         }

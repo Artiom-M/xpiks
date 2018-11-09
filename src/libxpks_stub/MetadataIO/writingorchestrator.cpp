@@ -9,25 +9,27 @@
  */
 
 #include "writingorchestrator.h"
-#include <QVector>
+
+#include <QDebug>
+#include <QObject>
 #include <QThread>
-#include <Helpers/indiceshelper.h>
-#include <Models/artworkmetadata.h>
-#include <Common/defines.h>
-#include "metadatawritingworker.h"
-#include <Helpers/asynccoordinator.h>
+#include <QtGlobal>
+
+#include "Artworks/artworkssnapshot.h"
+#include "Common/logging.h"
+#include "Helpers/asynccoordinator.h"
+
+#include "MetadataIO/metadatawritingworker.h"
 
 namespace libxpks {
     namespace io {
-        WritingOrchestrator::WritingOrchestrator(const MetadataIO::ArtworksSnapshot &artworksToWrite,
-                                                 Helpers::AsyncCoordinator *asyncCoordinator,
-                                                 Models::SettingsModel *settingsModel):
+        WritingOrchestrator::WritingOrchestrator(const Artworks::ArtworksSnapshot &artworksToWrite,
+                                                 Helpers::AsyncCoordinator &asyncCoordinator,
+                                                 Models::SettingsModel &settingsModel):
             m_ItemsToWriteSnapshot(artworksToWrite),
             m_SettingsModel(settingsModel),
             m_AsyncCoordinator(asyncCoordinator)
         {
-            Q_ASSERT(settingsModel != nullptr);
-            Q_ASSERT(asyncCoordinator != nullptr);
         }
 
         WritingOrchestrator::~WritingOrchestrator() {
@@ -58,6 +60,15 @@ namespace libxpks {
 
             thread->start();
             LOG_INFO << "Started image writing worker...";
+        }
+
+        void WritingOrchestrator::startMetadataWiping(bool useBackups) {
+            Helpers::AsyncCoordinatorStarter deferredStarter(m_AsyncCoordinator, -1);
+            Q_UNUSED(deferredStarter);
+
+            Q_UNUSED(useBackups);
+
+            LOG_INFO << "This functionality is missing from libxpks_stub";
         }
     }
 }

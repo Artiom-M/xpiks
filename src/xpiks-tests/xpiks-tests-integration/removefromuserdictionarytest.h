@@ -7,8 +7,8 @@ class RemoveFromUserDictionaryTest:
     public IntegrationTestBase
 {
 public:
-    RemoveFromUserDictionaryTest(Commands::CommandManager *commandManager):
-        IntegrationTestBase(commandManager)
+    RemoveFromUserDictionaryTest(IntegrationTestsEnvironment &environment, XpiksTestsApp &testsApp):
+        IntegrationTestBase(environment, testsApp)
     {}
 
     // IntegrationTestBase interface

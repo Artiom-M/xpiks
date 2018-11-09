@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,26 +11,59 @@
 #ifndef KEYWORDSSUGGESTOR_H
 #define KEYWORDSSUGGESTOR_H
 
+#include <memory>
+#include <vector>
+
 #include <QAbstractListModel>
-#include <QQmlEngine>
-#include <QObject>
-#include <QList>
 #include <QHash>
+#include <QModelIndex>
+#include <QObject>
 #include <QSet>
+#include <QString>
+#include <QStringList>
 #include <QTimer>
-#include "../Common/baseentity.h"
-#include "../Common/basickeywordsmodel.h"
-#include "suggestionartwork.h"
-#include "../Common/hold.h"
-#include "../Common/statefulentity.h"
+#include <QVariant>
+#include <Qt>
+
+#include "Artworks/basickeywordsmodel.h"
+#include "Common/messages.h"
+#include "Common/statefulentity.h"
+#include "Common/types.h"
+#include "Connectivity/analyticsuserevent.h"
+
+class QByteArray;
+class QModelIndex;
+
+namespace Common {
+    class ISystemEnvironment;
+}
+
+namespace Connectivity {
+    class RequestsService;
+}
+
+namespace Models {
+    class SettingsModel;
+    class SwitcherModel;
+    struct QuickBufferMessage;
+}
+
+namespace MetadataIO {
+    class MetadataIOService;
+}
+
+namespace Microstocks {
+    class IMicrostockAPIClients;
+}
 
 namespace Suggestion {
-    class SuggestionQueryEngineBase;
+    class ISuggestionEngine;
+    class SuggestionArtwork;
 
     class KeywordsSuggestor:
             public QAbstractListModel,
-            public Common::BaseEntity,
-            public Common::StatefulEntity
+            public Common::MessagesSource<Common::NamedType<Connectivity::UserAction>>,
+            public Common::MessagesSource<Models::QuickBufferMessage>
     {
         Q_OBJECT
         Q_PROPERTY(int suggestedKeywordsCount READ getSuggestedKeywordsCount NOTIFY suggestedKeywordsCountChanged)
@@ -41,14 +74,23 @@ namespace Suggestion {
         Q_PROPERTY(QString lastErrorString READ getLastErrorString WRITE setLastErrorString NOTIFY lastErrorStringChanged)
         Q_PROPERTY(bool isLocalSearch READ getIsLocalSearch NOTIFY isLocalSearchChanged)
         Q_PROPERTY(int searchTypeIndex READ getSearchTypeIndex WRITE setSearchTypeIndex NOTIFY searchTypeIndexChanged)
+        Q_PROPERTY(QStringList engineNames READ getEngineNames NOTIFY engineNamesChanged)
+
+    private:
+        using Common::MessagesSource<Common::NamedType<Connectivity::UserAction>>::sendMessage;
+        using Common::MessagesSource<Models::QuickBufferMessage>::sendMessage;
 
     public:
-        KeywordsSuggestor(QObject *parent=NULL);
-        virtual ~KeywordsSuggestor();
+        KeywordsSuggestor(Models::SwitcherModel &switcherModel,
+                          Models::SettingsModel &settingsModel,
+                          Common::ISystemEnvironment &environment,
+                          QObject *parent=nullptr);
 
     public:
         void setExistingKeywords(const QSet<QString> &keywords);
-        void initSuggestionEngines();
+        void initSuggestionEngines(Microstocks::IMicrostockAPIClients &microstockClients,
+                                   Connectivity::RequestsService &requestsService,
+                                   MetadataIO::MetadataIOService &metadataIOService);
         void setSuggestedArtworks(std::vector<std::shared_ptr<SuggestionArtwork> > &suggestedArtworks);
         void clear();
 
@@ -72,6 +114,9 @@ namespace Suggestion {
         int getSelectedArtworksCount() const { return m_SelectedArtworksCount; }
         const QString &getLastErrorString() const { return m_LastErrorString; }
         bool getIsLocalSearch() const;
+#ifdef INTEGRATION_TESTS
+        size_t getEnginesCount() const { return m_QueryEngines.size(); }
+#endif
 
     signals:
         void suggestedKeywordsCountChanged();
@@ -83,11 +128,13 @@ namespace Suggestion {
         void lastErrorStringChanged();
         void isLocalSearchChanged();
         void searchTypeIndexChanged();
+        void engineNamesChanged();
 
     private slots:
         void resultsAvailableHandler();
         void errorsReceivedHandler(const QString &error);
         void onLinearTimer();
+        void onSwitchesUpdated();
 
     public slots:
         void onLanguageChanged();
@@ -108,22 +155,12 @@ namespace Suggestion {
         Q_INVOKABLE void cancelSearch();
         Q_INVOKABLE void close() { clear(); }
         Q_INVOKABLE QStringList getSuggestedKeywords() { return m_SuggestedKeywords.getKeywords(); }
-        Q_INVOKABLE QStringList getEngineNames() const { return m_QueryEnginesNames; }
+        /*Q_INVOKABLE*/ QStringList getEngineNames() const;
         Q_INVOKABLE QString getSuggestedKeywordsString() { return m_SuggestedKeywords.getKeywordsString(); }
         Q_INVOKABLE void clearSuggested();
         Q_INVOKABLE void resetSelection();
-
-        Q_INVOKABLE QObject *getSuggestedKeywordsModel() {
-            QObject *item = &m_SuggestedKeywords;
-            QQmlEngine::setObjectOwnership(item, QQmlEngine::CppOwnership);
-            return item;
-        }
-
-        Q_INVOKABLE QObject *getAllOtherKeywordsModel() {
-            QObject *item = &m_AllOtherKeywords;
-            QQmlEngine::setObjectOwnership(item, QQmlEngine::CppOwnership);
-            return item;
-        }
+        Q_INVOKABLE QObject *getSuggestedKeywordsModel();
+        Q_INVOKABLE QObject *getAllOtherKeywordsModel();
 
     public:
         enum KeywordsSuggestor_Roles {
@@ -143,17 +180,27 @@ namespace Suggestion {
         QSet<QString> getSelectedArtworksKeywords() const;
         void updateSuggestedKeywords();
         void calculateBounds(int &lowerBound, int &upperBound) const;
+        std::shared_ptr<ISuggestionEngine> getSelectedEngine();
+
+#ifdef CORE_TESTS
+    public:
+        void setFakeSuggestions(std::vector<std::shared_ptr<SuggestionArtwork>> const &suggestions) {
+            m_Suggestions = suggestions;
+        }
+        void initialize() { m_State.init(); }
+#endif
 
     private:
-        QHash<QString, int> m_KeywordsHash;
-        std::vector<std::shared_ptr<SuggestionArtwork> > m_Suggestions;
-        QVector<SuggestionQueryEngineBase*> m_QueryEngines;
-        QStringList m_QueryEnginesNames;
+        Common::StatefulEntity m_State;
+        Models::SwitcherModel &m_SwitcherModel;
+        Models::SettingsModel &m_SettingsModel;
+        std::vector<std::shared_ptr<ISuggestionEngine>> m_QueryEngines;
+        std::vector<std::shared_ptr<SuggestionArtwork>> m_Suggestions;
         QString m_LastErrorString;
+        QHash<QString, int> m_KeywordsHash;
         QSet<QString> m_ExistingKeywords;
-        Common::FakeHold m_HoldPlaceholder;
-        Common::BasicKeywordsModel m_SuggestedKeywords;
-        Common::BasicKeywordsModel m_AllOtherKeywords;
+        Artworks::BasicKeywordsModel m_SuggestedKeywords;
+        Artworks::BasicKeywordsModel m_AllOtherKeywords;
         // hack to load previews gradually
         QTimer m_LinearTimer;
         volatile int m_LoadedPreviewsNumber;

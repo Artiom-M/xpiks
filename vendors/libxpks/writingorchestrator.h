@@ -1,12 +1,12 @@
 #ifndef WRITINGORCHESTRATOR_H
 #define WRITINGORCHESTRATOR_H
 
-#include <QVector>
-#include <QMutex>
-#include <MetadataIO/artworkssnapshot.h>
-
 namespace Models {
-    class ArtworkMetadata;
+    class SettingsModel;
+}
+
+namespace Artworks {
+    class ArtworksSnapshot;
 }
 
 namespace Helpers {
@@ -18,22 +18,24 @@ namespace libxpks {
         class WritingOrchestrator
         {
         public:
-            explicit WritingOrchestrator(const MetadataIO::ArtworksSnapshot &artworksToWrite,
-                                         Helpers::AsyncCoordinator *asyncCoordinator,
-                                         Models::SettingsModel *settingsModel);
+            explicit WritingOrchestrator(Artworks::ArtworksSnapshot const &artworksToWrite,
+                                         Helpers::AsyncCoordinator &asyncCoordinator,
+                                         Models::SettingsModel &settingsModel);
             virtual ~WritingOrchestrator();
 
         public:
             void startWriting(bool useBackups, bool useDirectExport=true);
+            void startMetadataWiping(bool useBackups);
 
         private:
-            void startWritingImages(bool useBackups, bool useDirectExport);
-            void startWritingVideos(bool useBackups, bool useDirectExport);
+            void startWritingImages(Artworks::ArtworksSnapshot &snapshot, bool useBackups, bool useDirectExport);
+            void startWritingVideos(Artworks::ArtworksSnapshot &snapshot, bool useBackups, bool useDirectExport);
+            void startWipingImages(Artworks::ArtworksSnapshot &snapshot, bool useBackups);
 
         private:
-            const MetadataIO::ArtworksSnapshot &m_ItemsToWriteSnapshot;
-            Models::SettingsModel *m_SettingsModel;
-            Helpers::AsyncCoordinator *m_AsyncCoordinator;
+            const Artworks::ArtworksSnapshot &m_ItemsToWriteSnapshot;
+            Models::SettingsModel &m_SettingsModel;
+            Helpers::AsyncCoordinator &m_AsyncCoordinator;
         };
     }
 }

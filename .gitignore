@@ -24,6 +24,11 @@ moc_*.h
 installer/packages/xpiks/data/
 *.qm
 UiTestsStubPlugin/
+*.qmlc
+*.jsc
+*.dmg
+*.dylib
+*.orig
 debian/*.debhelper
 debian/*.debhelper.*
 debian/xpiks/*

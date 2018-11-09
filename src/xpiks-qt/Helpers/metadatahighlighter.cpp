@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,13 +9,21 @@
  */
 
 #include "metadatahighlighter.h"
-#include "../QMLExtensions/colorsmodel.h"
-#include "../Helpers/stringhelper.h"
-#include "../Common/flags.h"
+
+#include <QColor>
+#include <Qt>
+#include <QtGlobal>
+
+#include "Common/flags.h"
+#include "Common/iflagsprovider.h"
+#include "Helpers/stringhelper.h"
+#include "QMLExtensions/colorsmodel.h"
+
+class QTextDocument;
 
 namespace Helpers {
     MetadataHighlighter::MetadataHighlighter(const QString &textToHighlight,
-                                             Common::IFlagsProvider *flagsProvider,
+                                             Common::IFlagsProvider<Common::SearchFlags> *flagsProvider,
                                              QMLExtensions::ColorsModel *colorsModel,
                                              QTextDocument *document):
         QSyntaxHighlighter(document),
@@ -33,7 +41,7 @@ namespace Helpers {
 
         int pos = 0;
         const int size = m_TextToHighlight.size();
-        Common::flag_t flags = m_FlagsProvider->getFlags();
+        auto flags = m_FlagsProvider->getFlags();
         Qt::CaseSensitivity caseSensitivity = Common::HasFlag(flags, Common::SearchFlags::CaseSensitive) ?
                     Qt::CaseSensitive : Qt::CaseInsensitive;
         const bool wholeWords = Common::HasFlag(flags, Common::SearchFlags::WholeWords);

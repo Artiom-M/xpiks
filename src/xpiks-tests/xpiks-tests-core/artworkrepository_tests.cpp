@@ -1,40 +1,48 @@
 #include "artworkrepository_tests.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <QList>
 #include <QSignalSpy>
-#include "Mocks/artitemsmodelmock.h"
+#include <QStringList>
+#include <QVariant>
+#include <QtGlobal>
+
+#include "Commands/Files/removedirectorycommand.h"
+#include "Common/flags.h"
+#include "Models/Artworks/artworksrepository.h"
+#include "Models/Session/recentdirectoriesmodel.h"
+#include "Models/settingsmodel.h"
+#include "UndoRedo/undoredomanager.h"
+
+#include "Mocks/artworkslistmodelmock.h"
 #include "Mocks/artworksrepositorymock.h"
 #include "Mocks/commandmanagermock.h"
-#include "../../xpiks-qt/Models/filteredartitemsproxymodel.h"
-#include "../../xpiks-qt/Models/artworksrepository.h"
-#include "../../xpiks-qt/QuickBuffer/quickbuffer.h"
-#include "../../xpiks-qt/KeywordsPresets/presetkeywordsmodel.h"
-#include "../../xpiks-qt/Models/artworkproxymodel.h"
-#include "../../xpiks-qt/Models/settingsmodel.h"
-#include "../../xpiks-qt/UndoRedo/undoredomanager.h"
+#include "Mocks/coretestsenvironment.h"
+#include "Mocks/filescollectionmock.h"
+
+#define DECLARE_BASIC_MODELS\
+    Mocks::CoreTestsEnvironment environment; \
+    Models::RecentDirectoriesModel recentDirectories(environment);\
+    recentDirectories.initialize();\
+    Mocks::ArtworksRepositoryMock artworksRepository(recentDirectories);
 
 #define DECLARE_MODELS_AND_GENERATE(count, withVector) \
-    Mocks::CommandManagerMock commandManagerMock;\
-    Mocks::ArtItemsModelMock artItemsModelMock;\
-    Models::ArtworksRepository artworksRepository;\
-    Models::FilteredArtItemsProxyModel filteredItemsModel;\
-    commandManagerMock.InjectDependency(&artworksRepository);\
-    commandManagerMock.InjectDependency(&artItemsModelMock);\
-    filteredItemsModel.setSourceModel(&artItemsModelMock);\
-    commandManagerMock.InjectDependency(&filteredItemsModel);\
-    commandManagerMock.generateAndAddArtworks(count, withVector);
+    DECLARE_BASIC_MODELS\
+    Mocks::ArtworksListModelMock artworksListModel(artworksRepository);\
+    UndoRedo::UndoRedoManager undoRedoManager;\
+    Mocks::CommandManagerMock commandManager(undoRedoManager);\
+    artworksListModel.generateAndAddArtworks(count, withVector);
 
 #define SETUP_SELECTION_TEST(count, dirsCount) \
-    Mocks::CommandManagerMock commandManagerMock; \
-    Mocks::ArtItemsModelMock artItemsMock; \
-    Mocks::ArtworksRepositoryMock artworksRepository; \
-    commandManagerMock.InjectDependency(&artworksRepository); \
-    Models::ArtItemsModel *artItemsModel = &artItemsMock; \
-    commandManagerMock.InjectDependency(artItemsModel); \
+    DECLARE_BASIC_MODELS\
+    Mocks::ArtworksListModelMock artworksListModel(artworksRepository);\
     UndoRedo::UndoRedoManager undoRedoManager; \
-    commandManagerMock.InjectDependency(&undoRedoManager); \
-    Models::SettingsModel settingsModel; \
-    commandManagerMock.InjectDependency(&settingsModel); \
-    settingsModel.setAutoFindVectors(false); \
-    commandManagerMock.generateAndAddArtworksEx(count, dirsCount, false); \
+    Mocks::CommandManagerMock commandManager(undoRedoManager);\
+    artworksListModel.generateAndAddArtworksEx(count, dirsCount, false); \
     QCOMPARE((int)artworksRepository.accessRepos().size(), dirsCount);
 
 #define CHECK_ONLY_SELECTED(selectedIndex) \
@@ -64,9 +72,7 @@
     QCOMPARE(artworksRepository.accessRepos()[index].getIsSelectedFlag(), false);
 
 void ArtworkRepositoryTests::simpleAccountFileTest() {
-    Mocks::CommandManagerMock commandManagerMock;
-    Models::ArtworksRepository repository;
-    commandManagerMock.InjectDependency(&repository);
+    DECLARE_BASIC_MODELS;
 
 #ifdef Q_OS_WIN
     QString filename = "C:/path/to/some/file";
@@ -76,19 +82,16 @@ void ArtworkRepositoryTests::simpleAccountFileTest() {
     QString directory = "/path/to/some";
 #endif
     qint64 dirID = 0;
-    bool status = repository.accountFile(filename, dirID);
+    auto flags = artworksRepository.accountFile(filename, dirID);
 
-    QCOMPARE(status, true);
-    QCOMPARE(repository.rowCount(), 1);
-    QCOMPARE(repository.getDirectoryPath(0), directory);
-    QCOMPARE(repository.getFilesCountForDirectory(directory), 1);
+    QVERIFY(Common::HasFlag(flags, Common::AccountFileFlags::FlagRepositoryCreated));
+    QCOMPARE(artworksRepository.rowCount(), 1);
+    QCOMPARE(artworksRepository.getDirectoryPath(0), directory);
+    QCOMPARE(artworksRepository.getFilesCountForDirectory(directory), 1);
 }
 
 void ArtworkRepositoryTests::accountSameFileTest() {
-    Mocks::CommandManagerMock commandManagerMock;
-    Models::ArtworksRepository repository;
-    commandManagerMock.InjectDependency(&repository);
-
+    DECLARE_BASIC_MODELS;
 
 #ifdef Q_OS_WIN
     QString filename = "C:/path/to/some/file";
@@ -99,19 +102,19 @@ void ArtworkRepositoryTests::accountSameFileTest() {
 #endif
 
     qint64 dirID = 0;
-    repository.accountFile(filename, dirID);
-    bool status = repository.accountFile(filename, dirID);
+    auto flags = artworksRepository.accountFile(filename, dirID);
+    QVERIFY(Common::HasFlag(flags, Common::AccountFileFlags::FlagRepositoryCreated));
 
-    QCOMPARE(status, false);
-    QCOMPARE(repository.rowCount(), 1);
-    QCOMPARE(repository.getDirectoryPath(0), directory);
-    QCOMPARE(repository.getFilesCountForDirectory(directory), 1);
+    flags = artworksRepository.accountFile(filename, dirID);
+    QCOMPARE(flags, Common::AccountFileFlags::None);
+
+    QCOMPARE(artworksRepository.rowCount(), 1);
+    QCOMPARE(artworksRepository.getDirectoryPath(0), directory);
+    QCOMPARE(artworksRepository.getFilesCountForDirectory(directory), 1);
 }
 
 void ArtworkRepositoryTests::addFilesFromOneDirectoryTest() {
-    Mocks::CommandManagerMock commandManagerMock;
-    Models::ArtworksRepository repository;
-    commandManagerMock.InjectDependency(&repository);;
+    DECLARE_BASIC_MODELS;
 
 #ifdef Q_OS_WIN
     QString filenameTemplate = "C:/path/to/some/file%1.jpg";
@@ -126,20 +129,18 @@ void ArtworkRepositoryTests::addFilesFromOneDirectoryTest() {
     while (count--) {
         QString filename = filenameTemplate.arg(5 - count - 1);
         qint64 dirID = 0;
-        if (!repository.accountFile(filename, dirID)) {
+        if (artworksRepository.accountFile(filename, dirID) == Common::AccountFileFlags::None) {
             anyWrong = true;
         }
     }
 
     QCOMPARE(anyWrong, false);
-    QCOMPARE(repository.rowCount(), 1);
-    QCOMPARE(repository.getFilesCountForDirectory(directory), 5);
+    QCOMPARE(artworksRepository.rowCount(), 1);
+    QCOMPARE(artworksRepository.getFilesCountForDirectory(directory), 5);
 }
 
 void ArtworkRepositoryTests::addAndRemoveSameFileTest() {
-    Mocks::CommandManagerMock commandManagerMock;
-    Models::ArtworksRepository repository;
-    commandManagerMock.InjectDependency(&repository);
+    DECLARE_BASIC_MODELS;
 
 #ifdef Q_OS_WIN
     QString filename = "C:/path/to/some/file";
@@ -148,20 +149,18 @@ void ArtworkRepositoryTests::addAndRemoveSameFileTest() {
 #endif
 
     qint64 dirID = 0;
-    bool status = repository.accountFile(filename, dirID);
-    QCOMPARE(status, true);
+    auto addFlags = artworksRepository.accountFile(filename, dirID);
+    QVERIFY(Common::HasFlag(addFlags, Common::AccountFileFlags::FlagRepositoryCreated));
 
-    bool removeResult = repository.removeFile(filename, dirID);
-    repository.cleanupEmptyDirectories();
+    auto removeFlags = artworksRepository.removeFile(filename, dirID);
+    artworksRepository.cleanupEmptyDirectories();
 
-    QCOMPARE(repository.rowCount(), 0);
-    QCOMPARE(removeResult, true);
+    QCOMPARE(artworksRepository.rowCount(), 0);
+    QVERIFY(Common::HasFlag(removeFlags, Common::RemoveFileFlags::FlagFileRemoved));
 }
 
 void ArtworkRepositoryTests::removeNotExistingFileTest() {
-    Mocks::CommandManagerMock commandManagerMock;
-    Models::ArtworksRepository repository;
-    commandManagerMock.InjectDependency(&repository);
+    DECLARE_BASIC_MODELS;
 
 #ifdef Q_OS_WIN
     QString filename1 = "C:/path/to/some/file1";
@@ -172,21 +171,19 @@ void ArtworkRepositoryTests::removeNotExistingFileTest() {
 #endif
 
     qint64 dirID = 0;
-    bool status = repository.accountFile(filename1, dirID);
-    QCOMPARE(status, true);
-    QCOMPARE(repository.rowCount(), 1);
+    auto addFlags = artworksRepository.accountFile(filename1, dirID);
+    QVERIFY(Common::HasFlag(addFlags, Common::AccountFileFlags::FlagRepositoryCreated));
+    QCOMPARE(artworksRepository.rowCount(), 1);
 
-    bool removeResult = repository.removeFile(filename2, dirID);
-    repository.cleanupEmptyDirectories();
+    auto removeFlags = artworksRepository.removeFile(filename2, dirID);
+    artworksRepository.cleanupEmptyDirectories();
 
-    QCOMPARE(removeResult, false);
-    QCOMPARE(repository.rowCount(), 1);
+    QCOMPARE(removeFlags, Common::RemoveFileFlags::None);
+    QCOMPARE(artworksRepository.rowCount(), 1);
 }
 
 void ArtworkRepositoryTests::brandNewDirectoriesCountTest() {
-    Mocks::CommandManagerMock commandManagerMock;
-    Models::ArtworksRepository repository;
-    commandManagerMock.InjectDependency(&repository);
+    DECLARE_BASIC_MODELS;
 
 #ifdef Q_OS_WIN
     QString filename1 = "C:/path/to/some/file1";
@@ -199,16 +196,14 @@ void ArtworkRepositoryTests::brandNewDirectoriesCountTest() {
     QStringList files;
     files << filename1 << filename2;
 
-    int newDirsCount = repository.getNewDirectoriesCount(files);
+    int newDirsCount = artworksRepository.getNewDirectoriesCount(files);
     QCOMPARE(newDirsCount, 1);
-    QCOMPARE(repository.rowCount(), 0);
-    QCOMPARE(repository.rowCount(), 0);
+    QCOMPARE(artworksRepository.rowCount(), 0);
+    QCOMPARE(artworksRepository.rowCount(), 0);
 }
 
 void ArtworkRepositoryTests::differentNewDirectoriesCountTest() {
-    Mocks::CommandManagerMock commandManagerMock;
-    Models::ArtworksRepository repository;
-    commandManagerMock.InjectDependency(&repository);
+    DECLARE_BASIC_MODELS;
 
 #ifdef Q_OS_WIN
     QString filename1 = "C:/path/to/some/file1";
@@ -221,16 +216,14 @@ void ArtworkRepositoryTests::differentNewDirectoriesCountTest() {
     QStringList files;
     files << filename1 << filename2;
 
-    int newDirsCount = repository.getNewDirectoriesCount(files);
+    int newDirsCount = artworksRepository.getNewDirectoriesCount(files);
     QCOMPARE(newDirsCount, files.length());
-    QCOMPARE(repository.rowCount(), 0);
-    QCOMPARE(repository.rowCount(), 0);
+    QCOMPARE(artworksRepository.rowCount(), 0);
+    QCOMPARE(artworksRepository.rowCount(), 0);
 }
 
 void ArtworkRepositoryTests::newFilesCountTest() {
-    Mocks::CommandManagerMock commandManagerMock;
-    Models::ArtworksRepository repository;
-    commandManagerMock.InjectDependency(&repository);
+    DECLARE_BASIC_MODELS;
 
 #ifdef Q_OS_WIN
     QString filename1 = "C:/path/to/some/file1";
@@ -242,17 +235,16 @@ void ArtworkRepositoryTests::newFilesCountTest() {
 
     QStringList files;
     files << filename1 << filename2;
+    auto filesSource = std::make_shared<Mocks::FilesCollectionMock>(files);
 
-    int newFilesCount = repository.getNewFilesCount(files);
+    int newFilesCount = artworksRepository.getNewFilesCount(filesSource);
     QCOMPARE(newFilesCount, files.length());
-    QCOMPARE(repository.rowCount(), 0);
-    QCOMPARE(repository.rowCount(), 0);
+    QCOMPARE(artworksRepository.rowCount(), 0);
+    QCOMPARE(artworksRepository.rowCount(), 0);
 }
 
 void ArtworkRepositoryTests::noNewDirectoriesCountTest() {
-    Mocks::CommandManagerMock commandManagerMock;
-    Models::ArtworksRepository repository;
-    commandManagerMock.InjectDependency(&repository);
+    DECLARE_BASIC_MODELS;
 
 #ifdef Q_OS_WIN
     QString filename1 = "C:/path/to/some/file1";
@@ -263,20 +255,18 @@ void ArtworkRepositoryTests::noNewDirectoriesCountTest() {
 #endif
 
     qint64 dirID = 0;
-    repository.accountFile(filename1, dirID);
+    artworksRepository.accountFile(filename1, dirID);
 
     QStringList files;
     files << filename2;
 
-    int newFilesCount = repository.getNewDirectoriesCount(files);
+    int newFilesCount = artworksRepository.getNewDirectoriesCount(files);
     QCOMPARE(newFilesCount, 0);
-    QCOMPARE(repository.rowCount(), 1);
+    QCOMPARE(artworksRepository.rowCount(), 1);
 }
 
 void ArtworkRepositoryTests::noNewFilesCountTest() {
-    Mocks::CommandManagerMock commandManagerMock;
-    Models::ArtworksRepository repository;
-    commandManagerMock.InjectDependency(&repository);
+    DECLARE_BASIC_MODELS;
 
 #ifdef Q_OS_WIN
     QString filename1 = "C:/path/to/some/file1";
@@ -291,54 +281,41 @@ void ArtworkRepositoryTests::noNewFilesCountTest() {
 
     qint64 dirID = 0;
     foreach (const QString &file, files) {
-        repository.accountFile(file, dirID);
+        artworksRepository.accountFile(file, dirID);
     }
 
-    int newFilesCount = repository.getNewFilesCount(files);
+    auto filesSource = std::make_shared<Mocks::FilesCollectionMock>(files);
+    int newFilesCount = artworksRepository.getNewFilesCount(filesSource);
     QCOMPARE(newFilesCount, 0);
-    QCOMPARE(repository.rowCount(), 1);
+    QCOMPARE(artworksRepository.rowCount(), 1);
 }
 
-void ArtworkRepositoryTests::endAccountingWithNoNewFilesTest() {
-    Mocks::CommandManagerMock commandManagerMock;
-    Models::ArtworksRepository repository;
-    commandManagerMock.InjectDependency(&repository);
-    QSignalSpy endSpy(&repository, SIGNAL(rowsInserted(QModelIndex,int,int)));
-
-    repository.endAccountingFiles(false);
-    QVERIFY(endSpy.isEmpty());
-}
-
-void ArtworkRepositoryTests::startAccountingNewFilesEmitsTest() {
-    Mocks::CommandManagerMock commandManagerMock;
-    Models::ArtworksRepository repository;
-    commandManagerMock.InjectDependency(&repository);
+void ArtworkRepositoryTests::accountFileEmitsTest() {
+    DECLARE_BASIC_MODELS;
 
 #ifdef Q_OS_WIN
-    QString filename1 = "C:/path/to/some/file1";
-    QString filename2 = "C:/path/to/some/other/file2";
+    QString filename = "C:/path/to/some/file1";
 #else
-    QString filename1 = "/path/to/some/file1";
-    QString filename2 = "/path/to/some/other/file2";
+    QString filename = "/path/to/some/file1";
 #endif
 
-    QStringList files;
-    files << filename1 << filename2;
+    QSignalSpy beginSpy(&artworksRepository, SIGNAL(rowsAboutToBeInserted(QModelIndex,int,int)));
+    QSignalSpy endSpy(&artworksRepository, SIGNAL(rowsInserted(QModelIndex,int,int)));
+    qint64 dirID = 0;
+    auto flags = artworksRepository.accountFile(filename, dirID);
 
-    QSignalSpy beginSpy(&repository, SIGNAL(rowsAboutToBeInserted(QModelIndex,int,int)));
-    bool newFiles = repository.beginAccountingFiles(files);
+    QVERIFY(Common::HasFlag(flags, Common::AccountFileFlags::FlagRepositoryCreated));
 
-    QCOMPARE(newFiles, true);
     QCOMPARE(beginSpy.count(), 1);
     QList<QVariant> addArguments = beginSpy.takeFirst();
     QCOMPARE(addArguments.at(1).toInt(), 0);
-    QCOMPARE(addArguments.at(2).toInt(), files.length() - 1);
+    QCOMPARE(addArguments.at(2).toInt(), 0);
+
+    QCOMPARE(endSpy.count(), 1);
 }
 
 void ArtworkRepositoryTests::selectFolderTest() {
-    Mocks::CommandManagerMock commandManagerMock;
-    Models::ArtworksRepository repository;
-    commandManagerMock.InjectDependency(&repository);
+    DECLARE_BASIC_MODELS;
 
 #ifdef Q_OS_WIN
     QString filename1 = "C:/path1/to/some/file";
@@ -358,53 +335,53 @@ void ArtworkRepositoryTests::selectFolderTest() {
     std::vector<qint64> dirIDs;
     foreach (const QString &file, files) {
         qint64 dirID;
-        repository.accountFile(file, dirID);
+        artworksRepository.accountFile(file, dirID);
         dirIDs.push_back(dirID);
     }
 
     // Initially all directories are selected.
-    QCOMPARE(repository.isDirectorySelected(dirIDs[0]), true);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[1]), true);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[2]), true);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[0]), true);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[1]), true);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[2]), true);
 
     //If All are selected and you click on 1, you select it and deselect others.
-    repository.toggleDirectorySelected(0);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[0]), true);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[1]), false);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[2]), false);
+    artworksRepository.toggleDirectorySelected(0);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[0]), true);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[1]), false);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[2]), false);
 
     //If not all are selected and you click on 1, you add it to the selection.
-    repository.toggleDirectorySelected(2);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[0]), true);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[1]), false);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[2]), true);
+    artworksRepository.toggleDirectorySelected(2);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[0]), true);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[1]), false);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[2]), true);
 
-    repository.toggleDirectorySelected(0);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[0]), false);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[1]), false);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[2]), true);
+    artworksRepository.toggleDirectorySelected(0);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[0]), false);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[1]), false);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[2]), true);
 
     //If you unselect last selected, all get selected.
-    repository.toggleDirectorySelected(2);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[0]), true);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[1]), true);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[2]), true);
+    artworksRepository.toggleDirectorySelected(2);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[0]), true);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[1]), true);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[2]), true);
 
-    repository.toggleDirectorySelected(2);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[0]), false);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[1]), false);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[2]), true);
+    artworksRepository.toggleDirectorySelected(2);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[0]), false);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[1]), false);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[2]), true);
 
     //If you remove last selected directory, all get selected.
-    repository.removeItem(2);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[0]), true);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[1]), true);
+    artworksRepository.removeItem(2);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[0]), true);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[1]), true);
 
     //If you add a new directory, it gets selected by default.
     qint64 dirID;
-    repository.accountFile(filename4, dirID);
+    artworksRepository.accountFile(filename4, dirID);
     dirIDs.push_back(dirID);
-    QCOMPARE(repository.isDirectorySelected(dirIDs[3]), true);
+    QCOMPARE(artworksRepository.isDirectorySelected(dirIDs[3]), true);
 }
 
 void ArtworkRepositoryTests::oneEmptyDirectoryStaysTest() {
@@ -412,9 +389,9 @@ void ArtworkRepositoryTests::oneEmptyDirectoryStaysTest() {
     DECLARE_MODELS_AND_GENERATE(count, false);
 
     QCOMPARE(artworksRepository.getFilesCountForDirectory(0), 1);
-    QCOMPARE(artItemsModelMock.getArtworksCount(), count);
+    QCOMPARE((int)artworksListModel.getArtworksSize(), count);
 
-    artItemsModelMock.removeArtworksDirectory(0);
+    artworksListModel.removeFilesFromDirectory(0);
     QCOMPARE(artworksRepository.rowCount(), 1);
 
     artworksRepository.cleanupEmptyDirectories();
@@ -427,12 +404,39 @@ void ArtworkRepositoryTests::fewEmptyDirectoriesStayTest() {
 
     QCOMPARE(artworksRepository.getFilesCountForDirectory(0), 1);
     QCOMPARE(artworksRepository.getFilesCountForDirectory(1), 1);
-    QCOMPARE(artItemsModelMock.getArtworksCount(), count);
+    QCOMPARE((int)artworksListModel.getArtworksSize(), count);
 
-    artItemsModelMock.removeArtworksDirectory(0);
-    artItemsModelMock.removeArtworksDirectory(1);
+    artworksListModel.removeFilesFromDirectory(0);
+    artworksListModel.removeFilesFromDirectory(1);
     QCOMPARE(artworksRepository.rowCount(), 2);
 
+    artworksRepository.cleanupEmptyDirectories();
+    QCOMPARE(artworksRepository.rowCount(), 0);
+}
+
+void ArtworkRepositoryTests::removeDirectoryWithHighIDNumberTest() {
+    DECLARE_BASIC_MODELS;
+    Mocks::ArtworksListModelMock artworksListModel(artworksRepository);
+    UndoRedo::UndoRedoManager undoRedoManager;
+    Mocks::CommandManagerMock commandManager(undoRedoManager);
+    Models::SettingsModel settingsModel(environment);
+    settingsModel.initializeConfigs();
+    Models::FilteredArtworksRepository filteredRepository(artworksRepository);
+
+    int dirsCount = 10;
+
+    artworksListModel.generateAndAddDirectories(dirsCount, 5, false);
+
+    while (dirsCount--) {
+        commandManager.processCommand(
+                    std::make_shared<Commands::RemoveDirectoryCommand>(
+                        filteredRepository.getOriginalIndex(0),
+                        artworksListModel,
+                        artworksRepository,
+                        settingsModel));
+    }
+
+    QCOMPARE(artworksListModel.getAvailableArtworksSize(), (size_t)0);
     artworksRepository.cleanupEmptyDirectories();
     QCOMPARE(artworksRepository.rowCount(), 0);
 }
@@ -491,7 +495,7 @@ void ArtworkRepositoryTests::removeOnlySelectedSelectsAllTest() {
     artworksRepository.unselectAllDirectories();
     artworksRepository.accessRepos()[toggleIndex].setIsSelectedFlag(true);
 
-    artItemsMock.removeArtworksDirectory(0);
+    artworksListModel.removeFilesFromDirectory(0);
     artworksRepository.cleanupEmptyDirectories();
 
     CHECK_ALL_SELECTED;
@@ -504,7 +508,7 @@ void ArtworkRepositoryTests::removeOneOfFewSelectedStaysSameTest() {
     artworksRepository.accessRepos()[0].setIsSelectedFlag(true);
     artworksRepository.accessRepos()[1].setIsSelectedFlag(true);
 
-    artItemsMock.removeArtworksDirectory(0);
+    artworksListModel.removeFilesFromDirectory(0);
     artworksRepository.cleanupEmptyDirectories();
 
     CHECK_SELECTED(0);
@@ -513,12 +517,19 @@ void ArtworkRepositoryTests::removeOneOfFewSelectedStaysSameTest() {
 
 void ArtworkRepositoryTests::undoRemoveOnlySelectedSelectsItTest() {
     SETUP_SELECTION_TEST(10, 3);
+    Models::SettingsModel settingsModel(environment);
+    settingsModel.initializeConfigs();
 
-    size_t toggleIndex = 2;
+    int toggleIndex = 2;
     artworksRepository.toggleDirectorySelected(toggleIndex);
     CHECK_ONLY_SELECTED(toggleIndex);
 
-    artItemsMock.removeArtworksDirectory(toggleIndex);
+    commandManager.processCommand(
+                std::make_shared<Commands::RemoveDirectoryCommand>(
+                    toggleIndex,
+                    artworksListModel,
+                    artworksRepository,
+                    settingsModel));
 
     bool undoStatus = undoRedoManager.undoLastAction();
     QVERIFY(undoStatus);
@@ -528,11 +539,18 @@ void ArtworkRepositoryTests::undoRemoveOnlySelectedSelectsItTest() {
 
 void ArtworkRepositoryTests::undoRemoveOneOfFewSelectedTest() {
     SETUP_SELECTION_TEST(10, 3);
+    Models::SettingsModel settingsModel(environment);
+    settingsModel.initializeConfigs();
 
     CHECK_ALL_SELECTED;
 
-    size_t toggleIndex = 2;
-    artItemsMock.removeArtworksDirectory(toggleIndex);
+    int toggleIndex = 2;
+    commandManager.processCommand(
+                std::make_shared<Commands::RemoveDirectoryCommand>(
+                    toggleIndex,
+                    artworksListModel,
+                    artworksRepository,
+                    settingsModel));
 
     bool undoStatus = undoRedoManager.undoLastAction();
     QVERIFY(undoStatus);
@@ -542,12 +560,19 @@ void ArtworkRepositoryTests::undoRemoveOneOfFewSelectedTest() {
 
 void ArtworkRepositoryTests::undoRemoveAfterUserSelectsOtherTest() {
     SETUP_SELECTION_TEST(10, 3);
+    Models::SettingsModel settingsModel(environment);
+    settingsModel.initializeConfigs();
 
-    size_t toggleIndex = 2;
+    int toggleIndex = 2;
     artworksRepository.toggleDirectorySelected(toggleIndex);
     CHECK_ONLY_SELECTED(toggleIndex);
 
-    artItemsMock.removeArtworksDirectory(toggleIndex);
+    commandManager.processCommand(
+                std::make_shared<Commands::RemoveDirectoryCommand>(
+                    toggleIndex,
+                    artworksListModel,
+                    artworksRepository,
+                    settingsModel));
 
     size_t selectedIndex = 0;
     artworksRepository.toggleDirectorySelected(selectedIndex);
@@ -563,12 +588,19 @@ void ArtworkRepositoryTests::undoRemoveAfterUserSelectsOtherTest() {
 
 void ArtworkRepositoryTests::undoRemoveAfterUserSelectsFewTest() {
     SETUP_SELECTION_TEST(10, 4);
+    Models::SettingsModel settingsModel(environment);
+    settingsModel.initializeConfigs();
 
-    size_t toggleIndex = 3;
+    int toggleIndex = 3;
     artworksRepository.toggleDirectorySelected(toggleIndex);
     CHECK_ONLY_SELECTED(toggleIndex);
 
-    artItemsMock.removeArtworksDirectory(toggleIndex);
+    commandManager.processCommand(
+                std::make_shared<Commands::RemoveDirectoryCommand>(
+                    toggleIndex,
+                    artworksListModel,
+                    artworksRepository,
+                    settingsModel));
 
     CHECK_ALL_SELECTED;
 
@@ -591,10 +623,17 @@ void ArtworkRepositoryTests::undoRemoveAfterUserSelectsFewTest() {
 
 void ArtworkRepositoryTests::undoRemoveOfTheOnlyOneSelectsItTest() {
     SETUP_SELECTION_TEST(10, 1);
+    Models::SettingsModel settingsModel(environment);
+    settingsModel.initializeConfigs();
 
     CHECK_ALL_SELECTED;
 
-    artItemsMock.removeArtworksDirectory(0);
+    commandManager.processCommand(
+                std::make_shared<Commands::RemoveDirectoryCommand>(
+                    0,
+                    artworksListModel,
+                    artworksRepository,
+                    settingsModel));
 
     bool undoStatus = undoRedoManager.undoLastAction();
     QVERIFY(undoStatus);
@@ -604,12 +643,19 @@ void ArtworkRepositoryTests::undoRemoveOfTheOnlyOneSelectsItTest() {
 
 void ArtworkRepositoryTests::undoRemoveAfterAllOtherSelectedTest() {
     SETUP_SELECTION_TEST(10, 4);
+    Models::SettingsModel settingsModel(environment);
+    settingsModel.initializeConfigs();
 
     size_t toggleIndex = 3;
     artworksRepository.toggleDirectorySelected(toggleIndex);
     CHECK_ONLY_SELECTED(toggleIndex);
 
-    artItemsMock.removeArtworksDirectory(toggleIndex);
+    commandManager.processCommand(
+                std::make_shared<Commands::RemoveDirectoryCommand>(
+                    toggleIndex,
+                    artworksListModel,
+                    artworksRepository,
+                    settingsModel));
 
     CHECK_ALL_SELECTED;
 

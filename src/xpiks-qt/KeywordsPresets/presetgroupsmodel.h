@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,23 +11,26 @@
 #ifndef PRESETGROUPSMODEL_H
 #define PRESETGROUPSMODEL_H
 
-#include <QString>
-#include <QAbstractListModel>
-#include <QReadWriteLock>
-#include <vector>
+#include <cstddef>
 #include <memory>
+#include <vector>
+
+#include <QAbstractListModel>
+#include <QHash>
+#include <QObject>
+#include <QReadWriteLock>
+#include <QString>
+#include <QStringList>
+#include <QVariant>
+#include <Qt>
+#include <QtGlobal>
+
+#include "KeywordsPresets/groupmodel.h"
+
+class QByteArray;
+class QModelIndex;
 
 namespace KeywordsPresets {
-    struct GroupModel {
-        GroupModel(const QString &name, int groupID):
-            m_Name(name),
-            m_GroupID(groupID)
-        { }
-
-        QString m_Name;
-        int m_GroupID;
-    };
-
     struct PresetGroupData;
     class PresetKeywordsGroupModel;
     class PresetKeywordsModel;
@@ -37,7 +40,7 @@ namespace KeywordsPresets {
         Q_OBJECT
         Q_PROPERTY(QStringList groupNames READ retrieveGroupNames NOTIFY groupNamesChanged)
     public:
-        PresetGroupsModel(PresetKeywordsModel *presetsModel);
+        PresetGroupsModel(PresetKeywordsModel &presetsModel);
 
     private:
         enum PresetGroups_Roles {
@@ -89,7 +92,7 @@ namespace KeywordsPresets {
         std::vector<GroupModel> m_GroupsList;
         std::vector<std::shared_ptr<PresetKeywordsGroupModel> > m_FilteredGroups;
         std::shared_ptr<PresetKeywordsGroupModel> m_DefaultGroup;
-        PresetKeywordsModel *m_PresetsModel;
+        PresetKeywordsModel &m_PresetsModel;
     };
 }
 

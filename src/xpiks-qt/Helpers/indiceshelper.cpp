@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,12 +9,17 @@
  */
 
 #include "indiceshelper.h"
-#include <cmath>
-#include <algorithm>
 
-namespace Models {
-    class ArtworkMetadata;
-}
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <iterator>
+
+#include <QtGlobal>
+
+#include "Artworks/artworkmetadata.h"  // IWYU pragma: keep
+
+template <typename T> class QVector;
 
 namespace Helpers {
     template<class T>
@@ -44,42 +49,13 @@ namespace Helpers {
     }
 
     template
-    int splitIntoChunks<Models::ArtworkMetadata*>(const QVector<Models::ArtworkMetadata*> &items,
-    int chunksCount, QVector<QVector<Models::ArtworkMetadata*> > &chunks);
+    int splitIntoChunks<Artworks::ArtworkMetadata*>(const QVector<Artworks::ArtworkMetadata*> &items,
+    int chunksCount, QVector<QVector<Artworks::ArtworkMetadata*> > &chunks);
 
 #ifdef CORE_TESTS
     template
     int splitIntoChunks<int>(const QVector<int> &items, int chunksCount, QVector<QVector<int> > &chunks);
 #endif
-
-    void indicesToRanges(const QVector<int> &indices, QVector<QPair<int, int> > &ranges) {
-        if (indices.empty()) { return; }
-
-        int currentStart = indices[0];
-        int indicesCount = indices.count();
-        ranges.reserve(indicesCount/3);
-
-        for (int i = 1; i < indicesCount; ++i) {
-            if (indices[i] - indices[i - 1] > 1) {
-                ranges.append(qMakePair(currentStart, indices[i - 1]));
-                currentStart = indices[i];
-            }
-        }
-
-        ranges.append(qMakePair(currentStart, indices[indicesCount - 1]));
-    }
-
-    int getRangesLength(const QVector<QPair<int, int> > &ranges) {
-        int sum = 0;
-
-        int length = ranges.length();
-        for (int i = 0; i < length; ++i) {
-            const QPair<int, int> &pair = ranges[i];
-            sum += pair.second - pair.first + 1;
-        }
-
-        return sum;
-    }
 
     bool segmentsOverlap(const std::pair<int, int> &a, const std::pair<int, int> &b) {
         if (a.first <= b.first) {

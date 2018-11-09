@@ -2,7 +2,8 @@
 #define FILTEREDMODELTESTS_H
 
 #include <QObject>
-#include <QtTest/QTest>
+#include <QtTest>  // IWYU pragma: keep
+// IWYU pragma: no_include <QString>
 
 class FilteredModelTests : public QObject
 {
@@ -16,6 +17,8 @@ private slots:
     void invertSelectionForOddCountTest();
     void removeMetadataMarksAsModifiedTest();
     void removeMetadataDeletesMetadataTest();
+    void selectedCountAddTest();
+    void selectedCountSubtractTest();
     void findSelectedIndexTest();
     void clearKeywordsTest();
     void detachVectorFromSelectedTest();
@@ -29,7 +32,12 @@ private slots:
     void filterTitleTest();
     void filterDescriptionAndKeywordsTest();
     void filterTitleAndKeywordsTest();
-    void clearEmptyKeywordsTest();
+    void clearEmptyKeywordsMarksModifiedTest();
+    void selectExVectorsTest();
+    void selectExModifiedTest();
+    void selectExAllTest();
+    void selectExNoneTest();
+    void selectExImagesTest();
 };
 
 #endif // FILTEREDMODELTESTS_H

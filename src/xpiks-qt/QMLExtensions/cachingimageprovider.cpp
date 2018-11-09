@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,8 +9,16 @@
  */
 
 #include "cachingimageprovider.h"
-#include "../Common/defines.h"
-#include "../QMLExtensions/imagecachingservice.h"
+
+#include <QChar>
+#include <QSize>
+#include <Qt>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Common/logging.h"
+#include "Helpers/stringhelper.h"
+#include "QMLExtensions/imagecachingservice.h"
 
 #define RECACHE true
 
@@ -19,8 +27,7 @@ namespace QMLExtensions {
         QString id;
 
         if (url.contains(QChar('%'))) {
-            QUrl initialUrl(url);
-            id = initialUrl.path();
+            id = Helpers::stringPercentDecode(url);
         } else {
             id = url;
         }
@@ -33,29 +40,27 @@ namespace QMLExtensions {
         if (url.isEmpty()) { return QImage(); }
 
         const QString id = prepareUrl(url);
+        LOG_DEBUG << "Requesting file:" << id;
 
         QString cachedPath;
         bool needsUpdate = false;
 
         if (m_ImageCachingService->tryGetCachedImage(id, requestedSize, cachedPath, needsUpdate)) {
-            QImage cachedImage(cachedPath);
-            *size = cachedImage.size();
-
             if (needsUpdate) {
-                LOG_INFO << "Recaching image" << id;
                 m_ImageCachingService->cacheImage(id, requestedSize, RECACHE);
             }
 
-            if (!cachedImage.isNull()) {
+            QImage cachedImage;
+            bool loaded = cachedImage.load(cachedPath);
+            if (loaded && !cachedImage.isNull()) {
+                *size = cachedImage.size();
                 return cachedImage;
             }
         }
 
-        LOG_INTEGR_TESTS_OR_DEBUG << "Not found properly cached:" << id;
+        LOG_DEBUG << "Not found properly cached:" << id;
 
         QImage originalImage(id);
-        *size = originalImage.size();
-
         QImage result;
 
         if (requestedSize.isValid()) {
@@ -67,6 +72,7 @@ namespace QMLExtensions {
             result = originalImage.scaled(m_ImageCachingService->getDefaultSize(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
         }
 
+        *size = result.size();
         return result;
     }
 }

@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,42 +9,78 @@
  */
 
 #include "localconfig.h"
-#include <QDir>
-#include <QStandardPaths>
+
+#include <QFile>
+#include <QIODevice>
+#include <QJsonObject>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Common/logging.h"
+#include "Helpers/jsonobjectmap.h"
 
 namespace Helpers {
-    LocalConfig::LocalConfig() {
+    LocalConfig::LocalConfig(const QString &filepath, bool memoryOnly):
+        m_FilePath(filepath),
+        m_MemoryOnly(memoryOnly)
+    {
+        Q_ASSERT(!m_FilePath.isEmpty());
     }
 
-    void LocalConfig::initConfig(const QString &configPath) {
-        m_FilePath = configPath;
+    QJsonDocument LocalConfig::readConfig() {
+        QJsonDocument config;
+
         QFile file(m_FilePath);
 
         if (file.open(QIODevice::ReadOnly)) {
             QString text = QString::fromUtf8(file.readAll());
             file.close();
-            m_Config = QJsonDocument::fromJson(text.toUtf8());
+            config = QJsonDocument::fromJson(text.toUtf8());
         } else {
             LOG_WARNING << "Opening file" << m_FilePath << "failed";
         }
+
+        return config;
     }
 
-    void LocalConfig::saveToFile() {
+    std::shared_ptr<JsonObjectMap> LocalConfig::readMap() {
+        std::shared_ptr<JsonObjectMap> stateMap;
+        QJsonDocument config = readConfig();
+        if (config.isObject()) {
+            QJsonObject json = config.object();
+            stateMap = std::make_shared<Helpers::JsonObjectMap>(json);
+        } else {
+            stateMap = std::make_shared<Helpers::JsonObjectMap>();
+        }
+        return stateMap;
+    }
+
+    bool LocalConfig::writeMap(const std::shared_ptr<JsonObjectMap> &map) {
+        if (m_MemoryOnly) { return true; }
+        if (m_FilePath.isEmpty()) { return false; }
+
+        QJsonDocument doc;
+        QJsonObject json = map->json();
+        doc.setObject(json);
+        bool success = writeConfig(doc);
+        return success;
+    }
+
+    bool LocalConfig::writeConfig(const QJsonDocument &config) {
+        if (m_MemoryOnly) { return true; }
+        if (m_FilePath.isEmpty()) { return false; }
+
+        bool success = false;
         QFile file(m_FilePath);
 
-        Q_ASSERT(!m_FilePath.isEmpty());
-
         if (file.open(QIODevice::WriteOnly)) {
-            file.write(m_Config.toJson(QJsonDocument::Indented));
+            file.write(config.toJson(QJsonDocument::Indented));
             file.close();
+            success = true;
         } else {
             LOG_WARNING << "Opening file" << m_FilePath << "failed";
         }
-    }
 
-    void LocalConfig::dropConfig() {
-        m_Config = QJsonDocument();
-        Q_ASSERT(m_Config.isEmpty());
+        return success;
     }
 }
-

@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,24 +11,70 @@
 #ifndef PLUGINMANAGER_H
 #define PLUGINMANAGER_H
 
-#include <vector>
 #include <memory>
-#include <QHash>
-#include <QDir>
+#include <vector>
+
 #include <QAbstractListModel>
+#include <QHash>
+#include <QModelIndex>
+#include <QObject>
 #include <QSortFilterProxyModel>
-#include "../Common/baseentity.h"
-#include "uiprovider.h"
+#include <QString>
+#include <QVariant>
+#include <Qt>
+
+#include "Plugins/sandboxeddependencies.h"
+#include "Plugins/uiprovider.h"
+
+class QByteArray;
+class QModelIndex;
+class QUrl;
+
+namespace Common {
+    class ISystemEnvironment;
+}
+
+namespace Commands {
+    class ICommandManager;
+}
+
+namespace KeywordsPresets {
+    class IPresetsManager;
+}
+
+namespace Microstocks {
+    class IMicrostockAPIClients;
+}
+
+namespace Models {
+    class ICurrentEditableSource;
+    class UIManager;
+}
+
+namespace Connectivity {
+    class RequestsService;
+}
+
+namespace Storage {
+    class DatabaseManager;
+}
 
 namespace Plugins {
     class XpiksPluginInterface;
     class PluginWrapper;
 
-    class PluginManager : public QAbstractListModel, public Common::BaseEntity
+    class PluginManager : public QAbstractListModel
     {
         Q_OBJECT
     public:
-        PluginManager();
+        PluginManager(Common::ISystemEnvironment &environment,
+                      Commands::ICommandManager &commandManager,
+                      KeywordsPresets::IPresetsManager &presetsManager,
+                      Storage::DatabaseManager &dbManager,
+                      Connectivity::RequestsService &requestsService,
+                      Microstocks::IMicrostockAPIClients &microstockClients,
+                      Models::ICurrentEditableSource &currentEditableSource,
+                      Models::UIManager &uiManager);
         virtual ~PluginManager();
 
     public:
@@ -42,7 +88,7 @@ namespace Plugins {
         };
 
     private:
-        bool initPluginsDir();
+        bool initialize();
         const QString &getPluginsDirectoryPath() const { return m_PluginsDirectoryPath; }
         void processInvalidFile(const QString &filename, const QString &pluginFullPath);
 
@@ -51,11 +97,10 @@ namespace Plugins {
         void unloadPlugins();
         bool hasExportedActions(int row) const;
         bool isUsable(int row) const;
-        UIProvider *getUIProvider() { return &m_UIProvider; }
+        UIProvider &getUIProvider() { return m_UIProvider; }
 
     public slots:
         void onCurrentEditableChanged();
-        void onLastActionUndone(int commandID);
         void onPresetsUpdated();
 
     public:
@@ -84,6 +129,12 @@ namespace Plugins {
         int getNextPluginID() { return m_LastPluginID++; }
 
     private:
+        Common::ISystemEnvironment &m_Environment;
+        Commands::ICommandManager &m_CommandManager;
+        KeywordsPresets::IPresetsManager &m_PresetsManager;
+        Storage::DatabaseManager &m_DatabaseManager;
+        MicrostockServicesSafe m_MicrostockServices;
+        Models::ICurrentEditableSource &m_CurrentEditableSource;
         QString m_PluginsDirectoryPath;
         QString m_FailedPluginsDirectory;
         std::vector<std::shared_ptr<PluginWrapper> > m_PluginsList;
@@ -95,9 +146,7 @@ namespace Plugins {
     class PluginsWithActionsModel: public QSortFilterProxyModel {
         Q_OBJECT
     public:
-        PluginsWithActionsModel(QObject *parent = 0):
-            QSortFilterProxyModel(parent)
-        {}
+        PluginsWithActionsModel(PluginManager &pluginManager, QObject *parent = 0);
 
     public:
         Q_INVOKABLE int getOriginalIndex(int index);

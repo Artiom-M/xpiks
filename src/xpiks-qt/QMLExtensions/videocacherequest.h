@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,9 +11,14 @@
 #ifndef VIDEOCACHEREQUEST_H
 #define VIDEOCACHEREQUEST_H
 
+#include <cstddef>
+#include <memory>
+
 #include <QString>
-#include "../Models/videoartwork.h"
-#include "../Common/flags.h"
+
+#include "Artworks/videoartwork.h"
+#include "Common/flags.h"
+#include "Common/types.h"
 
 namespace libthmbnlr {
     struct VideoFileMetadata;
@@ -31,24 +36,19 @@ namespace QMLExtensions {
         };
 
     public:
-        VideoCacheRequest(Models::VideoArtwork *videoArtwork, bool recache, bool quickThumbnail=true, bool withDelay=false, bool allowGoodQuality=false):
+        VideoCacheRequest(std::shared_ptr<Artworks::VideoArtwork> const &videoArtwork,
+                          bool recache,
+                          bool quickThumbnail=true,
+                          bool withDelay=false,
+                          bool allowGoodQuality=false):
             m_VideoArtwork(videoArtwork),
             m_Flags(0)
         {
-            if (m_VideoArtwork != nullptr) {
-                m_VideoArtwork->acquire();
-            }
 
             Common::ApplyFlag(m_Flags, recache, RecacheFlag);
             Common::ApplyFlag(m_Flags, quickThumbnail, QuickThumbnailFlag);
             Common::ApplyFlag(m_Flags, withDelay, WithDelayFlag);
             Common::ApplyFlag(m_Flags, allowGoodQuality, GoodQualityAllowed);
-        }
-
-        virtual ~VideoCacheRequest() {
-            if (m_VideoArtwork != NULL) {
-                m_VideoArtwork->release();
-            }
         }
 
     public:
@@ -63,15 +63,14 @@ namespace QMLExtensions {
         bool isRepeated() const { return Common::HasFlag(m_Flags, RepeatRequestFlag); }
 
     public:
-        void repeatRequestOnce() { if (!isRepeated()) { setRepeatRequest(); } }
         void setRepeatRequest() { Common::ApplyFlag(m_Flags, true, RepeatRequestFlag); }
         void setGoodQualityRequest() { Common::ApplyFlag(m_Flags, false, QuickThumbnailFlag); }
         void setThumbnailPath(const QString &path) { m_VideoArtwork->setThumbnailPath(path); }
         void setVideoMetadata(const libthmbnlr::VideoFileMetadata &metadata) { m_VideoArtwork->setVideoMetadata(metadata); }
-        Models::VideoArtwork *getArtwork() { return m_VideoArtwork; }
+        std::shared_ptr<Artworks::VideoArtwork> const &getArtwork() const { return m_VideoArtwork; }
 
     private:
-        Models::VideoArtwork *m_VideoArtwork;
+        std::shared_ptr<Artworks::VideoArtwork> m_VideoArtwork;
         Common::flag_t m_Flags;
     };
 }

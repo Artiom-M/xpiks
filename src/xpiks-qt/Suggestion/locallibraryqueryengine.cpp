@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,43 +9,65 @@
  */
 
 #include "locallibraryqueryengine.h"
-#include <QThread>
-#include <vector>
+
 #include <memory>
-#include "../MetadataIO/metadataioservice.h"
-#include "suggestionartwork.h"
-#include "../Common/defines.h"
+#include <utility>
+#include <vector>
+
+#include <QFileInfo>
+#include <QVector>
+#include <QtDebug>
+
+#include "Common/logging.h"
+#include "MetadataIO/cachedartwork.h"
+#include "MetadataIO/metadataioservice.h"
+#include "Microstocks/searchquery.h"
+#include "Suggestion/locallibraryquery.h"
+#include "Suggestion/suggestionartwork.h"
 
 #define MAX_LOCAL_RESULTS 200
 
 namespace Suggestion {
-    LocalLibraryQueryEngine::LocalLibraryQueryEngine(int engineID, MetadataIO::MetadataIOService *metadataIOService):
-        SuggestionQueryEngineBase(engineID),
-        m_MetadataIOService(metadataIOService)
+    LocalLibraryQueryEngine::LocalLibraryQueryEngine(int engineID,
+                                                     MetadataIO::MetadataIOService &metadataIOService):
+        m_EngineID(engineID),
+        m_MetadataIOService(metadataIOService),
+        m_IsEnabled(true)
     {
-        Q_ASSERT(metadataIOService != nullptr);
-
         QObject::connect(&m_Query, &LocalLibraryQuery::resultsReady,
                          this, &LocalLibraryQueryEngine::resultsFoundHandler);
     }
 
-    void LocalLibraryQueryEngine::submitQuery(const SearchQuery &query) {
-        LOG_DEBUG << query.m_SearchTerms;
+    void LocalLibraryQueryEngine::setSuggestions(std::vector<std::shared_ptr<SuggestionArtwork> > &suggestions) {
+        m_Suggestions = std::move(suggestions);
+        emit resultsAvailable();
+    }
+
+    void LocalLibraryQueryEngine::submitQuery(const Microstocks::SearchQuery &query) {
+        LOG_DEBUG << query.getSearchQuery();
         m_Query.setSearchQuery(query);
 
-        m_MetadataIOService->searchArtworks(&m_Query);
+        m_MetadataIOService.searchArtworks(&m_Query);
     }
 
     void LocalLibraryQueryEngine::resultsFoundHandler() {
+        LOG_DEBUG << "#";
         std::vector<std::shared_ptr<SuggestionArtwork> > results;
 
         auto &cachedArtworks = m_Query.getResults();
         for (auto &artwork: cachedArtworks) {
-            results.emplace_back(new SuggestionArtwork(artwork.m_Filepath, artwork.m_Title, artwork.m_Description, artwork.m_Keywords, true));
+#if !defined(UI_TESTS) && !defined(CORE_TESTS)
+            if (QFileInfo(artwork.m_Filepath).exists()) {
+#else
+            {
+#endif
+                results.emplace_back(
+                            std::make_shared<SuggestionArtwork>(
+                                artwork.m_Filepath, artwork.m_Title, artwork.m_Description, artwork.m_Keywords, true));
+            }
         }
 
-        setResults(results);
-        cachedArtworks.clear();
-        emit resultsAvailable();
+        setSuggestions(results);
+        m_Query.clear();
     }
 }

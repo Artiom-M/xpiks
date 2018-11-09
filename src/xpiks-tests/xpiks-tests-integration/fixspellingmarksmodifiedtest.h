@@ -6,8 +6,8 @@
 class FixSpellingMarksModifiedTest : public IntegrationTestBase
 {
 public:
-    FixSpellingMarksModifiedTest(Commands::CommandManager *commandManager):
-        IntegrationTestBase(commandManager)
+    FixSpellingMarksModifiedTest(IntegrationTestsEnvironment &environment, XpiksTestsApp &testsApp):
+        IntegrationTestBase(environment, testsApp)
     {}
 
     // IntegrationTestBase interface

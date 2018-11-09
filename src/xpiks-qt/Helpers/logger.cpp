@@ -2,7 +2,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -10,21 +10,20 @@
  */
 
 #include "logger.h"
-#include <QStringList>
-#include <QString>
-#include <QMutexLocker>
-#include <QMutex>
-#include <QFile>
-#include <QTextStream>
-#include <QTimer>
-#include <QDir>
-#include <QDateTime>
-#include <QStandardPaths>
-#include <QElapsedTimer>
+
 #include <iostream>
-#include <string>
-#include <ctime>
-#include "../Common/defines.h"
+
+#include <QFile>
+#include <QFlags>
+#include <QIODevice>
+#include <QMutex>
+#include <QMutexLocker>
+#include <QString>
+#include <QStringList>
+#include <QTextStream>
+#include <QtGlobal>
+
+#include "Encryption/obfuscation.h"
 
 #define MIN_FIRE_SIZE 20
 #define LOGGING_TIMEOUT 5
@@ -55,12 +54,62 @@ namespace Helpers {
         flushStream(m_QueueFlushFrom);
     }
 
+    void Logger::emergencyLog(const char * const message) {
+#ifdef WITH_LOGS
+        if (!m_MemoryOnly) {
+            QFile outFile(m_LogFilepath);
+            if (outFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Append)) {
+                outFile.write(message);
+                outFile.flush();
+            }
+        }
+#endif
+
+#ifdef WITH_STDOUT_LOGS
+        std::cout << message << std::endl;
+        std::cout.flush();
+#else
+        std::cerr << message << std::endl;
+        std::cerr.flush();
+#endif
+    }
+
+    void Logger::emergencyFlush() {
+        flushStream(&m_LogsStorage[0]);
+        flushStream(&m_LogsStorage[1]);
+    }
+
     void Logger::stop() {
         m_Stopped = true;
 
         // will make waiting flush() call unblocked if any
         doLog("Logging stopped.");
+        flushAll();
+    }
 
+#if defined(INTEGRATION_TESTS) || defined(UI_TESTS)
+    void Logger::abortFlush() {
+        doLog("Starting abort flush.");
+        flushAll();
+    }
+#endif
+
+    void Logger::doLog(const QString &message) {
+        QMutexLocker locker(&m_LogMutex);
+        m_QueueLogTo->append(message);
+        m_AnyLogsToFlush.wakeOne();
+    }
+
+    QString Logger::prepareLine(const QString &lineToWrite) {
+#ifdef QT_DEBUG
+        return lineToWrite;
+#else
+        return Encryption::rot13plus(lineToWrite);
+#endif
+    }
+
+    void Logger::flushAll()
+    {
         QMutexLocker flushLocker(&m_FlushMutex);
         flushStream(m_QueueFlushFrom);
 
@@ -75,34 +124,24 @@ namespace Helpers {
         flushStream(m_QueueFlushFrom);
     }
 
-#ifdef INTEGRATION_TESTS
-    void Logger::emergencyFlush() {
-        flushStream(&m_LogsStorage[0]);
-        flushStream(&m_LogsStorage[1]);
-    }
-#endif
-
-    void Logger::doLog(const QString &message) {
-        QMutexLocker locker(&m_LogMutex);
-        m_QueueLogTo->append(message);
-        m_AnyLogsToFlush.wakeOne();
-    }
-
     void Logger::flushStream(QStringList *logItems) {
         Q_ASSERT(logItems != nullptr);
         if (logItems->empty()) { return; }
 
 #ifdef WITH_LOGS
-        QFile outFile(m_LogFilepath);
-        if (outFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Append)) {
-            QTextStream ts(&outFile);
-            ts.setCodec("UTF-8");
+        if (!m_MemoryOnly) {
+            QFile outFile(m_LogFilepath);
+            if (outFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Append)) {
+                QTextStream ts(&outFile);
+                ts.setCodec("UTF-8");
 
-            int size = logItems->size();
-            for (int i = 0; i < size; ++i) {
-                const QString &line = logItems->at(i);
-                ts << line;
-                endl(ts);
+                int size = logItems->size();
+                for (int i = 0; i < size; ++i) {
+                    const QString &line = logItems->at(i);
+                    QString prepared = prepareLine(line);
+                    ts << prepared;
+                    endl(ts);
+                }
             }
         }
 #endif

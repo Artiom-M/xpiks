@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,76 +9,88 @@
  */
 
 #include "pluginmanager.h"
-#include <QPluginLoader>
-#include <QApplication>
+
+#include <cstddef>
+
+#include <Common/logging.h>
+#include <QAbstractItemModel>
+#include <QByteArray>
+#include <QChar>
 #include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QPluginLoader>
 #include <QQmlEngine>
-#include "xpiksplugininterface.h"
-#include "../Commands/commandmanager.h"
-#include "../UndoRedo/undoredomanager.h"
-#include "pluginwrapper.h"
-#include "../Models/artitemsmodel.h"
-#include "../Common/defines.h"
-#include "../Helpers/constants.h"
-#include "../Helpers/filehelpers.h"
+#include <QStringList>
+#include <QUrl>
+#include <QVector>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Common/flags.h"
+#include "Common/isystemenvironment.h"
+#include "Helpers/constants.h"
+#include "Helpers/filehelpers.h"
+#include "Plugins/pluginactionsmodel.h"
+#include "Plugins/pluginwrapper.h"
+#include "Plugins/sandboxeddependencies.h"
+#include "Plugins/uiprovider.h"
+#include "Plugins/xpiksplugininterface.h"
+
+namespace Microstocks {
+    class IMicrostockAPIClients;
+}
+
+namespace Models {
+    class UIManager;
+}
+
+namespace Storage {
+    class DatabaseManager;
+}
 
 namespace Plugins {
-    PluginManager::PluginManager():
+    PluginManager::PluginManager(Common::ISystemEnvironment &environment,
+                                 Commands::ICommandManager &commandManager,
+                                 KeywordsPresets::IPresetsManager &presetsManager,
+                                 Storage::DatabaseManager &dbManager,
+                                 Connectivity::RequestsService &requestsService,
+                                 Microstocks::IMicrostockAPIClients &microstockClients,
+                                 Models::ICurrentEditableSource &currentEditableSource,
+                                 Models::UIManager &uiManager):
         QAbstractListModel(),
+        m_Environment(environment),
+        m_CommandManager(commandManager),
+        m_PresetsManager(presetsManager),
+        m_DatabaseManager(dbManager),
+        m_MicrostockServices(microstockClients, requestsService),
+        m_CurrentEditableSource(currentEditableSource),
+        m_UIProvider(uiManager),
         m_LastPluginID(0)
-    {
-    }
+    { }
 
     PluginManager::~PluginManager() {
         LOG_DEBUG << "#";
     }
 
-    bool PluginManager::initPluginsDir() {
+    bool PluginManager::initialize() {
         LOG_DEBUG << "#";
+        bool success = m_Environment.ensureDirExists(Constants::PLUGINS_DIR);
+        if (!success) { return false; }
 
-        bool anyError = false;
-        const QString appDataPath = XPIKS_USERDATA_PATH;
-        QString basePath;
+        m_PluginsDirectoryPath = m_Environment.path({Constants::PLUGINS_DIR});
 
-        if (appDataPath.isEmpty()) {
-#ifdef Q_OS_MAC
-            QDir pluginsDir;
-            pluginsDir.setPath(QCoreApplication::applicationDirPath());
+        m_FailedPluginsDirectory = m_Environment.path({Constants::PLUGINS_DIR, Constants::FAILED_PLUGINS_DIR});
+        Helpers::ensureDirectoryExists(m_FailedPluginsDirectory);
 
-            if (pluginsDir.dirName() == "MacOS") {
-                pluginsDir.cdUp();
-            }
-
-            pluginsDir.cd("PlugIns");
-            pluginsDir.cd(Constants::PLUGINS_DIR);
-            basePath = pluginsDir.absolutePath();
-#else
-            basePath = QDir::currentPath();
-#endif
-        } else {
-            basePath = appDataPath;
-        }
-
-        const QString pluginsPath = QDir::cleanPath(basePath + QDir::separator() + Constants::PLUGINS_DIR);
-        LOG_INFO << "Trying" << pluginsPath;
-
-        if (!Helpers::ensureDirectoryExists(pluginsPath)) { anyError = true; }
-
-        if (!anyError) {
-            m_PluginsDirectoryPath = pluginsPath;
-            LOG_INFO << "Plugins directory:" << m_PluginsDirectoryPath;
-
-            m_FailedPluginsDirectory = QDir::cleanPath(pluginsPath + QDir::separator() + Constants::FAILED_PLUGINS_DIR);
-            Helpers::ensureDirectoryExists(m_FailedPluginsDirectory);
-        }
-
-        return !anyError;
+        LOG_INFO << "Plugins directory:" << m_PluginsDirectoryPath;
+        return true;
     }
 
     void PluginManager::processInvalidFile(const QString &filename, const QString &pluginFullPath) {
         LOG_DEBUG << pluginFullPath;
 
-        const QString failedDestination = QDir::cleanPath(m_FailedPluginsDirectory + QDir::separator() + filename);
+        const QString failedDestination = QDir::cleanPath(m_FailedPluginsDirectory + QChar('/') + filename);
         if (QFile::rename(pluginFullPath, failedDestination)) {
             LOG_INFO << "Moved invalid file from the plugins dir" << pluginFullPath;
         } else {
@@ -94,7 +106,7 @@ namespace Plugins {
     void PluginManager::loadPlugins() {
         LOG_DEBUG << "#";
 
-        if (!initPluginsDir()) {
+        if (!initialize()) {
             LOG_WARNING << "Failed to initialize plugins directory. Exiting...";
             return;
         }
@@ -137,6 +149,8 @@ namespace Plugins {
     }
 
     void PluginManager::unloadPlugins() {
+        m_UIProvider.closeAllDialogs();
+
         const size_t size = m_PluginsList.size();
         LOG_DEBUG << size << "plugin(s)";
 
@@ -186,18 +200,7 @@ namespace Plugins {
 
         for (size_t i = 0; i < size; ++i) {
             std::shared_ptr<PluginWrapper> &wrapper = m_PluginsList.at(i);
-            wrapper->notifyPlugin(Plugins::PluginNotificationFlags::CurrentEditableChanged, empty, nullptr);
-        }
-    }
-
-    void PluginManager::onLastActionUndone(int commandID) {
-        LOG_DEBUG << "#";
-        size_t size = m_PluginsList.size();
-        QVariant commandVariant = QVariant::fromValue(commandID);
-
-        for (size_t i = 0; i < size; ++i) {
-            std::shared_ptr<PluginWrapper> &wrapper = m_PluginsList.at(i);
-            wrapper->notifyPlugin(Plugins::PluginNotificationFlags::ActionUndone, commandVariant, nullptr);
+            wrapper->notifyPlugin(Common::PluginNotificationFlags::CurrentEditableChanged, empty, nullptr);
         }
     }
 
@@ -208,7 +211,7 @@ namespace Plugins {
 
         for (size_t i = 0; i < size; ++i) {
             std::shared_ptr<PluginWrapper> &wrapper = m_PluginsList.at(i);
-            wrapper->notifyPlugin(Plugins::PluginNotificationFlags::PresetsUpdated, empty, nullptr);
+            wrapper->notifyPlugin(Common::PluginNotificationFlags::PresetsUpdated, empty, nullptr);
         }
     }
 
@@ -285,7 +288,7 @@ namespace Plugins {
         QFileInfo existingFI(fullpath);
         if (existingFI.exists()) {
             const QString filename = existingFI.fileName();
-            QString destinationPath = QDir::cleanPath(m_PluginsDirectoryPath + QDir::separator() + filename);
+            QString destinationPath = QDir::cleanPath(m_PluginsDirectoryPath + QChar('/') + filename);
             exists = QFileInfo(destinationPath).exists() || isPluginAdded(destinationPath);
         }
 
@@ -309,7 +312,7 @@ namespace Plugins {
             }
 
             const QString filename = existingFI.fileName();
-            QString destinationPath = QDir::cleanPath(m_PluginsDirectoryPath + QDir::separator() + filename);
+            QString destinationPath = QDir::cleanPath(m_PluginsDirectoryPath + QChar('/') + filename);
             if (QFileInfo(destinationPath).exists() || isPluginAdded(destinationPath)) {
                 LOG_WARNING << "Plugin with same filename already added";
                 break;
@@ -377,7 +380,6 @@ namespace Plugins {
         LOG_INFO << filepath;
         std::shared_ptr<PluginWrapper> result;
 
-
         try {
             bool success = false;
             QPluginLoader loader(filepath);
@@ -416,20 +418,39 @@ namespace Plugins {
         const int pluginID = getNextPluginID();
         LOG_INFO << "ID:" << pluginID << "name:" << plugin->getPrettyName() << "version:" << plugin->getVersionString() << "filepath:" << filepath;
 
-        std::shared_ptr<PluginWrapper> pluginWrapper(new PluginWrapper(filepath, plugin, pluginID, &m_UIProvider));
+        auto pluginWrapper = std::make_shared<PluginWrapper>(filepath,
+                                                             plugin,
+                                                             pluginID,
+                                                             m_Environment,
+                                                             m_UIProvider,
+                                                             m_DatabaseManager);
+        bool initialized = false;
 
-        try {
-            plugin->injectCommandManager(m_CommandManager);
-            plugin->injectUndoRedoManager(m_CommandManager->getUndoRedoManager());
-            plugin->injectUIProvider(pluginWrapper->getUIProvider());
-            plugin->injectArtworksSource(m_CommandManager->getArtItemsModel());
-            plugin->injectPresetsManager(m_CommandManager->getPresetsModel());
+        do {
+            try {
+                plugin->injectCommandManager(&m_CommandManager);
+                plugin->injectUIProvider(&pluginWrapper->getUIProvider());
+                plugin->injectPresetsManager(&m_PresetsManager);
+                plugin->injectDatabaseManager(pluginWrapper->getDatabaseManager());
+                plugin->injectMicrostockServices(&m_MicrostockServices);
+                plugin->injectCurrentEditable(&m_CurrentEditableSource);
+            }
+            catch(...) {
+                LOG_WARNING << "Failed to inject dependencies to plugin with ID:" << pluginID;
+                break;
+            }
 
-            plugin->initializePlugin();
+            if (!pluginWrapper->initializePlugin()) { break; }
+
             // TODO: check this in config in future
-            plugin->enablePlugin();
-        }
-        catch(...) {
+            if (!pluginWrapper->enablePlugin()) { break; }
+
+            initialized = true;
+        } while(false);
+
+        if (!initialized) {
+            pluginWrapper->finalizePlugin();
+
             LOG_WARNING << "Fail initializing plugin with ID:" << pluginID;
             pluginWrapper.reset();
         }
@@ -475,6 +496,12 @@ namespace Plugins {
         roles[IsEnabledRole] = "enabled";
         roles[IsRemovedRole] = "removed";
         return roles;
+    }
+
+    PluginsWithActionsModel::PluginsWithActionsModel(PluginManager &pluginManager, QObject *parent):
+        QSortFilterProxyModel(parent)
+    {
+        setSourceModel(&pluginManager);
     }
 
     int PluginsWithActionsModel::getOriginalIndex(int index) {

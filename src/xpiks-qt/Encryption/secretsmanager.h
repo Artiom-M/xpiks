@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -12,11 +12,9 @@
 #define SECRETSMANAGER_H
 
 #include <QByteArray>
+#include <QMutex>
 #include <QObject>
 #include <QString>
-#include <QMutex>
-
-namespace Commands { class CommandManager; }
 
 namespace Encryption {
     class SecretsManager : public QObject {
@@ -24,11 +22,6 @@ namespace Encryption {
 
     public:
         SecretsManager();
-
-        void setCommandManager(Commands::CommandManager *commandManager) {
-            Q_ASSERT(commandManager != NULL);
-            m_CommandManager = commandManager;
-        }
 
     public:
         void setMasterPasswordHash(const QString &hash);
@@ -71,7 +64,6 @@ namespace Encryption {
         QString m_DefaultMasterPassword;
         // used for checks in Upload dialog and changing MP
         QByteArray m_MasterPasswordHash;
-        Commands::CommandManager *m_CommandManager;
         QMutex m_EncodingMutex;
     };
 }

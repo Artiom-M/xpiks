@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,11 +11,18 @@
 #ifndef SWITCHERCONFIG_H
 #define SWITCHERCONFIG_H
 
+#include <QHash>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QHash>
+#include <QObject>
 #include <QReadWriteLock>
-#include "../Models/abstractconfigupdatermodel.h"
+#include <QString>
+
+#include "Models/Connectivity/abstractconfigupdatermodel.h"
+
+namespace Common {
+    class ISystemEnvironment;
+}
 
 namespace Connectivity {
     class SwitcherConfig: public Models::AbstractConfigUpdaterModel
@@ -28,10 +35,10 @@ namespace Connectivity {
         };
 
     public:
-        SwitcherConfig(QObject *parent=nullptr);
+        SwitcherConfig(Common::ISystemEnvironment &environment,
+                       QObject *parent=nullptr);
 
     public:
-        void initializeConfigs();
         bool isSwitchOn(int switchKey, int minThreshold);
 
     signals:
@@ -57,7 +64,11 @@ namespace Connectivity {
             ProgressiveSuggestionPreviews,
             DirectMetadataExport,
             GoodQualityVideoPreviews,
-            MetadataAutoImport
+            MetadataAutoImport,
+            GettySuggestionEnabled,
+            UpdateEnabled,
+            KeywordsDragDropEnabled,
+            TelemetryEnabled
         };
 
     private:

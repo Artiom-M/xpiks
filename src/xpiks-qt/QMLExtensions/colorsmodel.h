@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,15 +11,16 @@
 #ifndef COLORSMODEL_H
 #define COLORSMODEL_H
 
-#include <QObject>
-#include <QColor>
-#include <QJsonObject>
-#include <QVector>
-#include <QStringList>
-
 #include <memory>
-#include <vector>
 #include <string>
+#include <vector>
+
+#include <QColor>
+#include <QList>
+#include <QObject>
+#include <QString>
+#include <QStringList>
+#include <QtGlobal>
 
 namespace QMLExtensions {
     class ColorsProvider {
@@ -81,6 +82,7 @@ namespace QMLExtensions {
         Q_PROPERTY(QColor statusBarColor READ statusBarColor WRITE setStatusBarColor NOTIFY statusBarColorChanged)
         Q_PROPERTY(QColor leftSliderColor READ leftSliderColor WRITE setLeftSliderColor NOTIFY leftSliderColorChanged)
         Q_PROPERTY(QColor popupBackgroundColor READ popupBackgroundColor WRITE setPopupBackgroundColor NOTIFY popupBackgroundColorChanged)
+        Q_PROPERTY(QColor popupGlowColor READ popupGlowColor WRITE setPopupGlowColor NOTIFY popupGlowColorChanged)
         Q_PROPERTY(QColor inactiveControlColor READ inactiveControlColor WRITE setInactiveControlColor NOTIFY inactiveControlColorChanged)
         Q_PROPERTY(QColor inactiveKeywordBackground READ inactiveKeywordBackground WRITE setInactiveKeywordBackground NOTIFY inactiveKeywordBackgroundChanged)
         Q_PROPERTY(QColor inactiveKeywordForeground READ inactiveKeywordForeground WRITE setInactiveKeywordForeground NOTIFY inactiveKeywordForegroundChanged)
@@ -136,7 +138,8 @@ namespace QMLExtensions {
         QColor m_inputHintForeground;
         QColor m_popupDarkInputBackground;
         QColor m_goldColor;
-        QColor m_buttonHoverForeground;
+        QColor m_buttonHoverForeground;        
+        QColor m_popupGlowColor;
 
     public:
         explicit ColorsModel(QObject *parent = 0);
@@ -373,6 +376,11 @@ namespace QMLExtensions {
             return m_buttonHoverForeground;
         }
 
+        QColor popupGlowColor() const
+        {
+            return m_popupGlowColor;
+        }
+
     signals:
         void themeChanged();
         void defaultDarkColorChanged(QColor defaultDarkColor);
@@ -418,7 +426,8 @@ namespace QMLExtensions {
         void inputHintForegroundChanged(QColor inputHintForeground);
         void popupDarkInputBackgroundChanged(QColor popupInputBackground);
         void goldColorChanged(QColor goldColor);
-        void buttonHoverForegroundChanged(QColor buttonHoverForeground);
+        void buttonHoverForegroundChanged(QColor buttonHoverForeground);        
+        void popupGlowColorChanged(QColor popupGlowColor);
 
     public slots:
         void setDefaultDarkColor(QColor defaultDarkColor)
@@ -772,6 +781,14 @@ namespace QMLExtensions {
 
             m_buttonHoverForeground = buttonHoverForeground;
             emit buttonHoverForegroundChanged(buttonHoverForeground);
+        }
+        void setPopupGlowColor(QColor popupGlowColor)
+        {
+            if (m_popupGlowColor == popupGlowColor)
+                return;
+
+            m_popupGlowColor = popupGlowColor;
+            emit popupGlowColorChanged(popupGlowColor);
         }
     };
 }

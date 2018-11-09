@@ -1,8 +1,10 @@
 #ifndef UPLOADCONTEXT
 #define UPLOADCONTEXT
 
+#include <QDebug>
 #include <QString>
-#include <Common/defines.h>
+
+#include "Common/logging.h"
 
 namespace Models {
     class ProxySettings;
@@ -19,6 +21,7 @@ namespace libxpks {
                 m_UseEPSV(false),
                 m_UseProxy(false),
                 m_VerboseLogging(false),
+                m_VectorsFirst(false),
                 m_ProxySettings(nullptr)
             { }
 
@@ -39,7 +42,8 @@ namespace libxpks {
             bool m_UseEPSV;
             bool m_UseProxy;
             bool m_VerboseLogging;
-            Models::ProxySettings *m_ProxySettings;
+            bool m_VectorsFirst;
+            Models::ProxySettings const *m_ProxySettings;
         };
     }
 }

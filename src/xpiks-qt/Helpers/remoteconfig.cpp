@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,14 +9,16 @@
  */
 
 #include "remoteconfig.h"
-#include <QThread>
-#include "../Common/defines.h"
-#include "../Connectivity/simplecurlrequest.h"
-#include "../Models/proxysettings.h"
+
+#include <QJsonParseError>
+#include <QtDebug>
+
+#include "Common/logging.h"
 
 namespace Helpers {
-    RemoteConfig::RemoteConfig(QObject *parent):
-        QObject(parent)
+    RemoteConfig::RemoteConfig(const QString &configUrl, QObject *parent):
+        QObject(parent),
+        m_ConfigUrl(configUrl)
     {
     }
 
@@ -25,14 +27,14 @@ namespace Helpers {
 
     void RemoteConfig::setRemoteResponse(const QByteArray &responseData) {
         QJsonParseError error;
-        LOG_INTEGR_TESTS_OR_DEBUG << responseData;
+        LOG_VERBOSE_OR_DEBUG << responseData;
 
         m_Config = QJsonDocument::fromJson(responseData, &error);
 
         if (error.error == QJsonParseError::NoError) {
             emit configArrived();
         } else {
-            LOG_INTEGRATION_TESTS << m_ConfigUrl;
+            LOG_VERBOSE << m_ConfigUrl;
             LOG_WARNING << "Failed to parse remote json" << error.errorString();
         }
     }

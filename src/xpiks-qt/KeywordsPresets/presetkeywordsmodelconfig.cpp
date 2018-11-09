@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,13 +9,28 @@
  */
 
 #include "presetkeywordsmodelconfig.h"
-#include <QStandardPaths>
-#include <QDir>
+
+#include <cstddef>
+
+#include <QFile>
+#include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonArray>
-#include "presetkeywordsmodel.h"
-#include "../Common/version.h"
+#include <QJsonValue>
+#include <QJsonValueRef>
+#include <QLatin1String>
+#include <QList>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Artworks/basickeywordsmodel.h"
+#include "Common/isystemenvironment.h"
+#include "Common/logging.h"
+#include "Common/version.h"
+#include "Helpers/localconfig.h"
+#include "KeywordsPresets/groupmodel.h"
+#include "KeywordsPresets/presetmodel.h"
 
 namespace KeywordsPresets {
 #define OVERWRITE_KEY QLatin1String("overwrite")
@@ -29,15 +44,7 @@ namespace KeywordsPresets {
 #define GROUP_NAME_KEY QLatin1String("name")
 #define GROUP_ID_KEY QLatin1String("id")
 
-#ifdef QT_DEBUG
-    #ifdef INTEGRATION_TESTS
-        #define LOCAL_PRESETKEYWORDS_LIST_FILE "tests_keywords_presets.json"
-    #else
-        #define LOCAL_PRESETKEYWORDS_LIST_FILE "debug_keywords_presets.json"
-    #endif
-#else
 #define LOCAL_PRESETKEYWORDS_LIST_FILE "keywords_presets.json"
-#endif
 
 #define OVERWRITE_PRESETS_CONFIG false
 
@@ -64,44 +71,40 @@ namespace KeywordsPresets {
         return parsed;
     }
 
-    PresetKeywordsModelConfig::PresetKeywordsModelConfig()
+    PresetKeywordsModelConfig::PresetKeywordsModelConfig(Common::ISystemEnvironment &environment):
+        m_Environment(environment),
+        m_Config(environment.path({LOCAL_PRESETKEYWORDS_LIST_FILE}),
+                 environment.getIsInMemoryOnly()),
+        m_LocalConfigPath(environment.path({LOCAL_PRESETKEYWORDS_LIST_FILE}))
     { }
 
     void PresetKeywordsModelConfig::initializeConfigs() {
         LOG_DEBUG << "#";
 
-        QString localConfigPath;
-
-        QString appDataPath = XPIKS_USERDATA_PATH;
-        if (!appDataPath.isEmpty()) {
-            QDir appDataDir(appDataPath);
-            localConfigPath = appDataDir.filePath(LOCAL_PRESETKEYWORDS_LIST_FILE);
-        } else {
-            localConfigPath = LOCAL_PRESETKEYWORDS_LIST_FILE;
-        }
-
         if (XPIKS_MAJOR_VERSION_CHECK(1, 5) ||
                 XPIKS_MAJOR_VERSION_CHECK(1, 4)) {
-            backupXpiks14xPresets(localConfigPath);
+            if (!m_Environment.getIsInMemoryOnly()) {
+                backupXpiks14xPresets(m_LocalConfigPath);
+            }
         } else {
             // remove backup for 1.6
             Q_ASSERT(false);
         }
 
-        m_Config.initConfig(localConfigPath);
-        processLocalConfig(m_Config.getConfig());
+        QJsonDocument document = m_Config.readConfig();
+        processLocalConfig(document);
     }
 
-    void PresetKeywordsModelConfig::loadFromModel(const std::vector<PresetModel *> &presets,
+    void PresetKeywordsModelConfig::loadFromModel(const std::vector<std::shared_ptr<PresetModel>> &presets,
                                                   const std::vector<GroupModel> &presetGroups) {
         const size_t presetsSize = presets.size();
-        LOG_INTEGR_TESTS_OR_DEBUG << presets.size() << "presets;" << presetGroups.size() << "groups";
+        LOG_VERBOSE_OR_DEBUG << presets.size() << "presets;" << presetGroups.size() << "groups";
 
         m_PresetData.clear();
         m_PresetData.resize(presetsSize);
 
         for (size_t i = 0; i < presetsSize; i++) {
-            auto *item = presets[i];
+            auto &item = presets[i];
             auto &name = item->m_PresetName;
             auto &keywordsModel = item->m_KeywordsModel;
             int groupId = item->m_GroupID;
@@ -151,7 +154,7 @@ namespace KeywordsPresets {
     }
 
     bool PresetKeywordsModelConfig::processLocalConfig(const QJsonDocument &document) {
-        LOG_INTEGR_TESTS_OR_DEBUG << document;
+        LOG_VERBOSE_OR_DEBUG << document;
         bool anyError = false;
 
         do {
@@ -290,10 +293,6 @@ namespace KeywordsPresets {
         QJsonDocument doc;
         doc.setObject(rootObject);
 
-        Helpers::LocalConfigDropper dropper(&m_Config);
-        Q_UNUSED(dropper);
-
-        m_Config.setConfig(doc);
-        m_Config.saveToFile();
+        m_Config.writeConfig(doc);
     }
 }

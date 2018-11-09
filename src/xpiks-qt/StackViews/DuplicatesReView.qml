@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -25,6 +25,8 @@ Rectangle {
     color: uiColors.defaultDarkColor
     property bool wasLeftSideCollapsed
     property bool isRestricted: false
+    // duplicates target should be the same in combined and single view
+    property var duplicatesModel: dispatcher.getCommandTarget(UICommand.ReviewDuplicatesSingle)
 
     Stack.onStatusChanged: {
         if (Stack.status == Stack.Active) {
@@ -94,9 +96,10 @@ Rectangle {
             spacing: 20
 
             delegate: Rectangle {
-                property int delegateIndex: index
-                color: uiColors.defaultControlColor
                 id: imageWrapper
+                property int delegateIndex: index
+                property int artworkIndex: originalIndex
+                color: uiColors.defaultControlColor
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.rightMargin: 10
@@ -133,28 +136,25 @@ Rectangle {
                             cache: false
                         }
 
-                        Image {
-                            id: videoTypeIconSmall
-                            visible: isvideo
-                            enabled: isvideo
-                            source: "qrc:/Graphics/video-icon-s.png"
-                            fillMode: Image.PreserveAspectFit
-                            //sourceSize.width: 150
-                            //sourceSize.height: 150
-                            anchors.fill: artworkImage
-                            cache: true
-                        }
-
-                        Image {
-                            id: imageTypeIcon
-                            visible: hasvectorattached
-                            enabled: hasvectorattached
-                            source: "qrc:/Graphics/vector-icon.svg"
-                            sourceSize.width: 20
-                            sourceSize.height: 20
-                            anchors.left: artworkImage.left
+                        Rectangle {
+                            anchors.right: artworkImage.right
                             anchors.bottom: artworkImage.bottom
-                            cache: true
+                            width: 20
+                            height: 20
+                            color: uiColors.defaultDarkColor
+                            property bool isVideo: isvideo
+                            property bool isVector: hasvectorattached
+                            visible: isVideo || isVector
+                            enabled: isVideo || isVector
+
+                            Image {
+                                id: typeIcon
+                                anchors.fill: parent
+                                source: parent.isVector ? "qrc:/Graphics/vector-icon.svg" : (parent.isVideo ? "qrc:/Graphics/video-icon.svg" : "")
+                                sourceSize.width: 20
+                                sourceSize.height: 20
+                                cache: true
+                            }
                         }
                     }
 
@@ -326,13 +326,7 @@ Rectangle {
                         anchors.verticalCenterOffset: -5
                         anchors.centerIn: parent
                         enabled: !isRestricted && duplicatesListView.count > 0
-
-                        onClicked: {
-                            var index = imageWrapper.delegateIndex
-                            var derivedIndex = filteredArtItemsModel.getDerivedIndex(originalIndex)
-                            var metadata = filteredArtItemsModel.getArtworkMetadata(derivedIndex)
-                            startOneItemEditing(metadata, derivedIndex, originalIndex)
-                        }
+                        onClicked: dispatcher.dispatch(UICommand.SetupArtworkEdit, imageWrapper.artworkIndex)
                     }
                 }
             }

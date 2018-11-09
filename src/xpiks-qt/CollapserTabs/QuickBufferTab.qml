@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -31,10 +31,10 @@ ColumnLayout {
         anchors.right: parent.right
         text: i18.n + qsTr("Apply")
         enabled: {
-            var result = (!quickBuffer.isEmpty) && uiManager.hasCurrentEditable;
+            var result = (!quickBuffer.isEmpty) && currentEditable.isAvailable;
             if (result) {
-                if (mainStackView.areActionsAllowed) {
-                    result = (filteredArtItemsModel.selectedArtworksCount <= 1);
+                if (appHost.areActionsAllowed) {
+                    result = (filteredArtworksListModel.selectedArtworksCount <= 1);
                 }
             }
 
@@ -55,9 +55,18 @@ ColumnLayout {
         anchors.right: parent.right
 
         StyledText {
+            id: titleText
             anchors.left: parent.left
             text: i18.n + qsTr("Title:")
             isActive: false
+        }
+
+        StyledText {
+            anchors.left: titleText.right
+            anchors.leftMargin: 3
+            text: "*"
+            color: uiColors.destructiveColor
+            visible: quickBuffer.hasTitleSpellErrors
         }
 
         StyledText {
@@ -101,8 +110,9 @@ ColumnLayout {
 
             StyledTextEdit {
                 id: titleTextInput
+                objectName: "titleTextInput"
                 focus: true
-                width: titleFlick.width
+                width: paintedWidth > titleFlick.width ? paintedWidth : titleFlick.width
                 height: titleFlick.height
                 text: quickBuffer.title
                 isActive: false
@@ -133,12 +143,12 @@ ColumnLayout {
                 }
 
                 Component.onCompleted: {
-                    quickBuffer.initTitleHighlighting(titleTextInput.textDocument)
+                    uiManager.initTitleHighlighting(
+                                quickBuffer.getBasicModelObject(),
+                                titleTextInput.textDocument)
                 }
 
                 onCursorRectangleChanged: titleFlick.ensureVisible(cursorRectangle)
-
-                onActiveFocusChanged: quickBuffer.spellCheckTitle()
 
                 Keys.onPressed: {
                     if(event.matches(StandardKey.Paste)) {
@@ -164,9 +174,18 @@ ColumnLayout {
         anchors.right: parent.right
 
         StyledText {
+            id: descriptionText
             anchors.left: parent.left
             isActive: false
             text: i18.n + qsTr("Description:")
+        }
+
+        StyledText {
+            anchors.left: descriptionText.right
+            anchors.leftMargin: 3
+            text: "*"
+            color: uiColors.destructiveColor
+            visible: quickBuffer.hasDescriptionSpellErrors
         }
 
         StyledText {
@@ -213,8 +232,9 @@ ColumnLayout {
 
             StyledTextEdit {
                 id: descriptionTextInput
+                objectName: "descriptionTextInput"
                 width: descriptionFlick.width
-                height: descriptionFlick.height
+                height: paintedHeight > descriptionFlick.height ? paintedHeight : descriptionFlick.height
                 text: quickBuffer.description
                 focus: true
                 isActive: false
@@ -242,7 +262,8 @@ ColumnLayout {
                 textFormat: TextEdit.PlainText
 
                 Component.onCompleted: {
-                    quickBuffer.initDescriptionHighlighting(descriptionTextInput.textDocument)
+                    uiManager.initDescriptionHighlighting(quickBuffer.getBasicModelObject(),
+                                                          descriptionTextInput.textDocument)
                 }
 
                 Keys.onBacktabPressed: {
@@ -255,8 +276,6 @@ ColumnLayout {
                 }
 
                 onCursorRectangleChanged: descriptionFlick.ensureVisible(cursorRectangle)
-
-                onActiveFocusChanged: quickBuffer.spellCheckDescription()
 
                 Keys.onPressed: {
                     if(event.matches(StandardKey.Paste)) {
@@ -289,6 +308,15 @@ ColumnLayout {
         }
 
         StyledText {
+            anchors.left: keywordsLabel.right
+            anchors.leftMargin: 3
+            anchors.top: keywordsLabel.top
+            text: "*"
+            color: uiColors.destructiveColor
+            visible: quickBuffer.hasKeywordsSpellErrors
+        }
+
+        StyledText {
             anchors.right: parent.right
             text: quickBuffer.keywordsCount
             isActive: false
@@ -308,7 +336,8 @@ ColumnLayout {
         anchors.right: parent.right
         anchors.rightMargin: quickScrollBar.visible ? 10 : 0
         color: uiColors.inputInactiveBackground
-        property var keywordsModel: quickBuffer.getBasicModel()
+        property var keywordsModel: quickBuffer.getBasicModelObject()
+        state: ""
 
         function removeKeyword(index) {
             quickBuffer.removeKeywordAt(index)
@@ -319,7 +348,11 @@ ColumnLayout {
         }
 
         function appendKeyword(keyword) {
-            quickBuffer.appendKeyword(keyword)
+            var added = quickBuffer.appendKeyword(keyword)
+            if (!added) {
+                keywordsWrapper.state = "blinked"
+                blinkTimer.start()
+            }
         }
 
         function pasteKeywords(keywords) {
@@ -332,6 +365,7 @@ ColumnLayout {
 
         EditableTags {
             id: flv
+            objectName: "editableTags"
             anchors.fill: parent
             model: keywordsWrapper.keywordsModel
             property int keywordHeight: uiManager.keywordHeight
@@ -382,6 +416,22 @@ ColumnLayout {
             anchors.rightMargin: -15
             flickable: flv
         }
+
+        Timer {
+            id: blinkTimer
+            repeat: false
+            interval: 400
+            triggeredOnStart: false
+            onTriggered: keywordsWrapper.state = ""
+        }
+
+        states: State {
+            name: "blinked";
+            PropertyChanges {
+                target: keywordsWrapper;
+                border.width: 0
+            }
+        }
     }
 
     Item {
@@ -398,6 +448,7 @@ ColumnLayout {
         }
 
         StyledLink {
+            objectName: "copyLink"
             text: i18.n + qsTr("Copy")
             enabled: quickBuffer.keywordsCount > 0
             onClicked: quickClipboard.setText(quickBuffer.getKeywordsString())
@@ -410,6 +461,7 @@ ColumnLayout {
         }
 
         StyledLink {
+            objectName: "clearLink"
             text: i18.n + qsTr("Clear")
             enabled: quickBuffer.keywordsCount > 0
             onClicked: quickBuffer.clearKeywords()

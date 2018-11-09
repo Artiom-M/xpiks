@@ -6,8 +6,8 @@
 class LocalLibrarySearchTest : public IntegrationTestBase
 {
 public:
-    LocalLibrarySearchTest(Commands::CommandManager *commandManager):
-        IntegrationTestBase(commandManager)
+    LocalLibrarySearchTest(IntegrationTestsEnvironment &environment, XpiksTestsApp &testsApp):
+        IntegrationTestBase(environment, testsApp)
     {}
 
     // IntegrationTestBase interface

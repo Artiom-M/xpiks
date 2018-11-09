@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,15 +11,20 @@
 #ifndef FILTERHELPERS_H
 #define FILTERHELPERS_H
 
-#include <QString>
-#include "../Common/flags.h"
+#include <memory>
 
-namespace Models {
+#include <QString>
+
+#include "Common/flags.h"
+
+namespace Artworks {
     class ArtworkMetadata;
 }
 
 namespace Helpers {
-    bool hasSearchMatch(const QString &searchTerm, Models::ArtworkMetadata *metadata, Common::SearchFlags searchFlags);
+    bool hasSearchMatch(const QString &searchTerm,
+                        std::shared_ptr<Artworks::ArtworkMetadata> const &artwork,
+                        Common::SearchFlags searchFlags);
 }
 
 #endif // FILTERHELPERS_H

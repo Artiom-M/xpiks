@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -13,8 +13,15 @@
 
 #include <QSyntaxHighlighter>
 #include <QString>
-#include <QTextDocument>
-#include "../Common/iflagsprovider.h"
+#include <QTextCharFormat>
+
+#include "Common/flags.h"
+
+class QTextDocument;
+
+namespace Common {
+    template <class T> class IFlagsProvider;
+}
 
 namespace QMLExtensions {
     class ColorsModel;
@@ -26,7 +33,7 @@ namespace Helpers {
     {
     public:
         MetadataHighlighter(const QString &textToHighlight,
-                            Common::IFlagsProvider *flagsProvider,
+                            Common::IFlagsProvider<Common::SearchFlags> *flagsProvider,
                             QMLExtensions::ColorsModel *colorsModel,
                             QTextDocument *document=0);
 
@@ -36,7 +43,7 @@ namespace Helpers {
     private:
         QMLExtensions::ColorsModel *m_ColorsModel;
         QString m_TextToHighlight;
-        Common::IFlagsProvider *m_FlagsProvider;
+        Common::IFlagsProvider<Common::SearchFlags> *m_FlagsProvider;
         QTextCharFormat m_Format;
     };
 }

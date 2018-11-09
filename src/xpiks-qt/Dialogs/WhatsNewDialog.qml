@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -68,7 +68,7 @@ Item {
             anchors.bottomMargin: -glowRadius/2
             glowRadius: 4
             spread: 0.0
-            color: uiColors.defaultControlColor
+            color: uiColors.popupGlowColor
             cornerRadius: glowRadius
         }
 
@@ -108,54 +108,47 @@ Item {
                 property int currentSlideIndex: 0
                 property int previousSlideIndex: 0
 
+                // slide pictures should be in 2:1 aspect ratio
                 property list<Item> whatsNewSlides: [
                     PresentationSlide {
                         parent: slidesHost
                         id: firstSlide
-                        title: i18.n + qsTr("Presets for keywords")
-                        imageUrl: "qrc:/Graphics/presets.png"
-                        width: slidesHost.width
-                        height: slidesHost.height
+                        title: i18.n + qsTr("Video files support")
+                        imageUrl: "qrc:/Graphics/whatsnew/videosupport.png"
+                        anchors.fill: parent
+                        anchors.margins: 1
                     },
                     PresentationSlide {
                         parent: slidesHost
                         id: secondSlide
-                        title: i18.n + qsTr("Additional buffer for quick editing")
-                        imageUrl: "qrc:/Graphics/quickbuffer.png"
-                        width: slidesHost.width
-                        height: slidesHost.height
+                        title: i18.n + qsTr("Detection of semantical duplicates")
+                        imageUrl: "qrc:/Graphics/whatsnew/duplicates.png"
+                        anchors.fill: parent
+                        anchors.margins: 1
                     },
                     PresentationSlide {
                         parent: slidesHost
                         id: thirdSlide
-                        title: i18.n + qsTr("Find and Replace functionality")
-                        imageUrl: "qrc:/Graphics/findandreplace.png"
-                        width: slidesHost.width
-                        height: slidesHost.height
+                        title: i18.n + qsTr("Presets groups")
+                        imageUrl: "qrc:/Graphics/whatsnew/presetsgroups.png"
+                        anchors.fill: parent
+                        anchors.margins: 1
                     },
                     PresentationSlide {
                         parent: slidesHost
                         id: fourthSlide
-                        title: i18.n + qsTr("StarDict dictionaries support")
-                        imageUrl: "qrc:/Graphics/translator.png"
-                        width: slidesHost.width
-                        height: slidesHost.height
-                    },
-                    PresentationSlide {
-                        parent: slidesHost
-                        id: fifthSlide
-                        title: i18.n + qsTr("List of failed uploads")
-                        imageUrl: "qrc:/Graphics/faileduploads.png"
-                        width: slidesHost.width
-                        height: slidesHost.height
+                        title: i18.n + qsTr("Upgraded look and feel")
+                        imageUrl: "qrc:/Graphics/whatsnew/lookandfeel.png"
+                        anchors.fill: parent
+                        anchors.margins: 1
                     },
                     PresentationSlide {
                         parent: slidesHost
                         id: sixsSlide
                         title: i18.n + qsTr("Bug fixes and improvements")
-                        imageUrl: "qrc:/Graphics/gears.png"
-                        width: slidesHost.width
-                        height: slidesHost.height
+                        imageUrl: "qrc:/Graphics/whatsnew/gears.png"
+                        anchors.fill: parent
+                        anchors.margins: 1
                     }
                 ]
 
@@ -212,7 +205,7 @@ Item {
 
                 StyledLink {
                     text: i18.n + qsTr("Skip")
-                    color: skipMA.pressed ? uiColors.linkClickedColor : uiColors.labelInactiveForeground
+                    normalLinkColor: uiColors.labelInactiveForeground
                     onClicked: {
                         settingsModel.saveCurrentVersion()
                         closePopup()
@@ -225,7 +218,7 @@ Item {
 
                 StyledLink {
                     text: i18.n + qsTr("Previous")
-                    color: previousMA.pressed ? uiColors.linkClickedColor : uiColors.labelActiveForeground
+                    normalLinkColor: uiColors.labelActiveForeground
                     onClicked: {
                         slidesHost.swipeBackward()
                         actionButton.text = qsTr("Next")

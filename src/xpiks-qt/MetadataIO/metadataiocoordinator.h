@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,36 +11,46 @@
 #ifndef METADATAIOCOORDINATOR_H
 #define METADATAIOCOORDINATOR_H
 
-#include <QObject>
-#include <QVector>
-#include <QAtomicInt>
 #include <set>
-#include "../Common/baseentity.h"
-#include "../Common/defines.h"
-#include "../Common/readerwriterqueue.h"
-#include "originalmetadata.h"
-#include "metadatareadinghub.h"
+
+#include <QObject>
+#include <QString>
+#include <QtGlobal>
+
+#include "Helpers/asynccoordinator.h"
+
+template <typename T> class QVector;
+
+namespace Artworks {
+    class ArtworkMetadata;
+    class ArtworksSnapshot;
+}
 
 namespace Models {
-    class ArtworkMetadata;
+    class SettingsModel;
+    class SwitcherModel;
+}
+
+namespace QMLExtensions {
+    class VideoCachingService;
 }
 
 namespace MetadataIO {
-    class MetadataWritingWorker;
-    class ArtworksSnapshot;
+    class MetadataReadingHub;
 
-    class MetadataIOCoordinator : public QObject, public Common::BaseEntity
+    class MetadataIOCoordinator : public QObject
     {
         Q_OBJECT
         Q_PROPERTY(int processingItemsCount READ getProcessingItemsCount WRITE setProcessingItemsCount NOTIFY processingItemsCountChanged)
         Q_PROPERTY(bool hasErrors READ getHasErrors WRITE setHasErrors NOTIFY hasErrorsChanged)
         Q_PROPERTY(bool exiftoolNotFound READ getExiftoolNotFound WRITE setExiftoolNotFound NOTIFY exiftoolNotFoundChanged)
         Q_PROPERTY(bool isInProgress READ getIsInProgress WRITE setIsInProgress NOTIFY isInProgressChanged)
-    public:
-        MetadataIOCoordinator();
 
     public:
-        virtual void setCommandManager(Commands::CommandManager *commandManager) override;
+        MetadataIOCoordinator(MetadataReadingHub &readingHub,
+                              Models::SettingsModel &settingsModel,
+                              Models::SwitcherModel &switcherModel,
+                              QMLExtensions::VideoCachingService &videoCachingService);
 
     signals:
         void metadataReadingFinished();
@@ -49,6 +59,7 @@ namespace MetadataIO {
         void hasErrorsChanged(bool value);
         void exiftoolNotFoundChanged();
         void isInProgressChanged();
+        void recommendedExiftoolFound(const QString &path);
 
     public:
         bool getExiftoolNotFound() const { return m_ExiftoolNotFound; }
@@ -57,42 +68,18 @@ namespace MetadataIO {
         bool getIsInProgress() const { return m_IsInProgress; }
 
     public:
-        void setExiftoolNotFound(bool value) {
-            if (value != m_ExiftoolNotFound) {
-                LOG_INFO << value;
-                m_ExiftoolNotFound = value;
-                emit exiftoolNotFoundChanged();
-            }
-        }
-
-        void setProcessingItemsCount(int value) {
-            if (value != m_ProcessingItemsCount) {
-                m_ProcessingItemsCount = value;
-                emit processingItemsCountChanged(value);
-            }
-        }
-
-        void setHasErrors(bool value) {
-            if (value != m_HasErrors) {
-                m_HasErrors = value;
-                emit hasErrorsChanged(value);
-            }
-        }
-
-        void setIsInProgress(bool value) {
-            if (value != m_IsInProgress) {
-                m_IsInProgress = value;
-                emit isInProgressChanged();
-            }
-        }
+        void setExiftoolNotFound(bool value);
+        void setProcessingItemsCount(int value);
+        void setHasErrors(bool value);
+        void setIsInProgress(bool value);
 
     public:
-        int readMetadataExifTool(const ArtworksSnapshot &artworksToRead, quint32 storageReadBatchID);
-        void writeMetadataExifTool(const ArtworksSnapshot &artworksToWrite, bool useBackups);
-        void autoDiscoverExiftool();
-        void setRecommendedExiftoolPath(const QString &recommendedExiftool);
+        int readMetadataExifTool(Artworks::ArtworksSnapshot const &artworksToRead, quint32 storageReadBatchID);
+        void reimportMetadataExiftool(Artworks::ArtworksSnapshot const &artworksToRead);
+        void writeMetadataExifTool(Artworks::ArtworksSnapshot const &artworksToWrite, bool useBackups);
+        void wipeAllMetadataExifTool(Artworks::ArtworksSnapshot const &artworksToWipe, bool useBackups);
 
-#ifdef INTEGRATION_TESTS
+#if defined(INTEGRATION_TESTS) || defined(UI_TESTS)
     public:
         const std::set<int> &getImportIDs() const { return m_PreviousImportIDs; }
         void clear() { m_PreviousImportIDs.clear(); }
@@ -101,23 +88,32 @@ namespace MetadataIO {
     public:
         Q_INVOKABLE bool shouldUseAutoImport() const;
         Q_INVOKABLE void continueReading(bool ignoreBackups);
-        Q_INVOKABLE void continueWithoutReading();
+        Q_INVOKABLE void continueWithoutReading(bool ignoreBackups, bool reimport = false);
         Q_INVOKABLE bool hasImportFinished(int importID);
+
+    signals:
+        void importStarted(int importID, bool reimport);
+        void importFinished(int importID);
 
     private slots:
         void writingWorkersFinished(int status);
         void onReadingFinished(int importID);
 
-    private:
-        int getNextImportID();
-        void initializeImport(const ArtworksSnapshot &artworksToRead, int importID, quint32 storageReadBatchID);
-        void readingFinishedHandler(bool ignoreBackups);
-        void afterImportHandler(const QVector<Models::ArtworkMetadata*> &itemsToRead, bool ignoreBackups);
+    public slots:
+        void onRecommendedExiftoolFound(const QString &path);
 
     private:
-        MetadataReadingHub m_ReadingHub;
+        int getNextImportID();
+        void initializeImport(const Artworks::ArtworksSnapshot &artworksToRead, int importID, quint32 storageReadBatchID);
+        void readingFinishedHandler(bool ignoreBackups);
+        void afterImportHandler(const QVector<Artworks::ArtworkMetadata*> &itemsToRead, bool ignoreBackups);
+
+    private:
         Helpers::AsyncCoordinator m_WritingAsyncCoordinator;
-        QString m_RecommendedExiftoolPath;
+        MetadataReadingHub &m_ReadingHub;
+        Models::SettingsModel &m_SettingsModel;
+        Models::SwitcherModel &m_SwitcherModel;
+        QMLExtensions::VideoCachingService &m_VideoCachingService;
         int m_LastImportID;
         std::set<int> m_PreviousImportIDs;
         volatile int m_ProcessingItemsCount;

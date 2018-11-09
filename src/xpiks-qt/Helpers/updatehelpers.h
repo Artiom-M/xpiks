@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -13,8 +13,12 @@
 
 #include <QString>
 
+namespace Common {
+    class ISystemEnvironment;
+}
+
 namespace Helpers {
-    void installUpdate(const QString &updatePath);
+    void installUpdate(Common::ISystemEnvironment &environment, const QString &updatePath);
 }
 
 #endif // UPDATEHELPERS_H

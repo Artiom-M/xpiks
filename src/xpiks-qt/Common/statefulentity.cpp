@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,63 +9,51 @@
  */
 
 #include "statefulentity.h"
-#include <QDir>
-#include "../Helpers/constants.h"
-#include "../Helpers/filehelpers.h"
+
+#include <Qt>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Common/isystemenvironment.h"
+#include "Common/logging.h"
+#include "Helpers/constants.h"
+#include "Helpers/jsonobjectmap.h"
+#include "Helpers/localconfig.h"
 
 namespace Common {
-    QAtomicInt StatefulEntity::s_DirectoryInitialized = 0;
-
-    StatefulEntity::StatefulEntity(const QString &stateName):
-        m_StateName(stateName)
+    StatefulEntity::StatefulEntity(const QString &stateName, ISystemEnvironment &environment):
+        m_StateName(stateName),
+        m_Config(environment.path({Constants::STATES_DIR, QString("%1.json").arg(stateName)}),
+                 environment.getIsInMemoryOnly()),
+        m_StateMap(std::make_shared<Helpers::JsonObjectMap>()),
+        m_InitCounter(0)
     {
         Q_ASSERT(!stateName.endsWith(".json", Qt::CaseInsensitive));
     }
 
-    void StatefulEntity::initState() {
+    StatefulEntity::~StatefulEntity() {
+        Q_ASSERT(m_InitCounter.load() > 0);
+    }
+
+    void StatefulEntity::init() {
         LOG_DEBUG << m_StateName;
-        QString localConfigPath;
 
-#if defined(QT_DEBUG)
-        QString filename = QString("debug_%1.json").arg(m_StateName);
-#elif defined(INTEGRATION_TESTS)
-        QString filename = QString("tests_%1.json").arg(m_StateName);
-#else
-        QString filename = QString("%1.json").arg(m_StateName);
-#endif
-
-        QString appDataPath = XPIKS_USERDATA_PATH;
-        if (!appDataPath.isEmpty()) {
-            const QString statesPath = QDir::cleanPath(appDataPath + QDir::separator() + Constants::STATES_DIR);
-            if (s_DirectoryInitialized.fetchAndAddOrdered(1) == 0) {
-                Helpers::ensureDirectoryExists(statesPath);
-            }
-
-            QDir statesDir(statesPath);
-            Q_ASSERT(statesDir.exists());
-            localConfigPath = statesDir.filePath(filename);
+        if (m_InitCounter.fetchAndAddOrdered(1) == 0) {
+            m_StateMap = m_Config.readMap();
         } else {
-            localConfigPath = filename;
-        }
-
-        m_StateConfig.initConfig(localConfigPath);
-
-        QJsonDocument &doc = m_StateConfig.getConfig();
-        if (doc.isObject()) {
-            m_StateJson = doc.object();
+            LOG_WARNING << "Attempt to initialize state" << m_StateName << "twice";
+            Q_ASSERT(false);
         }
     }
 
-    void StatefulEntity::syncState() {
+    void StatefulEntity::sync() {
         LOG_DEBUG << m_StateName;
 
-        Helpers::LocalConfigDropper dropper(&m_StateConfig);
-        Q_UNUSED(dropper);
-
-        QJsonDocument doc;
-        doc.setObject(m_StateJson);
-
-        m_StateConfig.setConfig(doc);
-        m_StateConfig.saveToFile();
+        if (m_InitCounter.loadAcquire() > 0) {
+            m_Config.writeMap(m_StateMap);
+        } else {
+            LOG_WARNING << "State" << m_StateName << "is not initialized!";
+            Q_ASSERT(false);
+        }
     }
 }

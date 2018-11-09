@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,24 +11,27 @@
 #ifndef CSVEXPORTWORKER_H
 #define CSVEXPORTWORKER_H
 
-#include <QObject>
-#include <vector>
 #include <memory>
-#include "artworkssnapshot.h"
-#include "csvexportproperties.h"
+#include <vector>
+
+#include <QObject>
+#include <QString>
+
+namespace Artworks {
+    class ArtworksSnapshot;
+}
 
 namespace MetadataIO {
+    struct CsvExportPlan;
 
     class CsvExportWorker: public QObject
     {
         Q_OBJECT
     public:
         CsvExportWorker(const std::vector<std::shared_ptr<CsvExportPlan> > &exportPlans,
-                        ArtworksSnapshot &selectedArtworks,
-                        QString exportDirectoryPath,
+                        Artworks::ArtworksSnapshot &selectedArtworks,
+                        const QString &exportDirectoryPath,
                         QObject *parent = 0);
-
-        virtual ~CsvExportWorker();
 
     public:
         void dismiss() { emit stopped(); }
@@ -44,7 +47,7 @@ namespace MetadataIO {
 
     private:
         const std::vector<std::shared_ptr<CsvExportPlan> > &m_ExportPlans;
-        ArtworksSnapshot &m_ArtworksToExport;
+        Artworks::ArtworksSnapshot &m_ArtworksToExport;
         QString m_ExportDirectoryPath;
     };
 }

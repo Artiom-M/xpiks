@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,38 +9,36 @@
  */
 
 #include "imagecachingservice.h"
-#include <QThread>
+
+#include <cstddef>
+#include <memory>
+#include <vector>
+
 #include <QScreen>
-#include "imagecachingworker.h"
-#include "imagecacherequest.h"
-#include "../Models/artworkmetadata.h"
-#include "../Models/imageartwork.h"
-#include "../Helpers/asynccoordinator.h"
-#include "../Commands/commandmanager.h"
-#include "../MetadataIO/artworkssnapshot.h"
+#include <QThread>
+#include <QtDebug>
+
+#include "Artworks/artworkmetadata.h"
+#include "Artworks/artworkssnapshot.h"
+#include "Artworks/imageartwork.h"  // IWYU pragma: keep
+#include "Common/logging.h"
+#include "QMLExtensions/imagecacherequest.h"
+#include "QMLExtensions/imagecachingworker.h"
 
 namespace QMLExtensions {
-    ImageCachingService::ImageCachingService(QObject *parent) :
+    ImageCachingService::ImageCachingService(Common::ISystemEnvironment &environment,
+                                             QObject *parent) :
         QObject(parent),
-        Common::BaseEntity(),
-        m_CachingWorker(NULL),
+        m_Environment(environment),
+        m_CachingWorker(nullptr),
         m_IsCancelled(false),
         m_Scale(1.0)
     {
         updateDefaultSize();
     }
 
-    void ImageCachingService::startService(const std::shared_ptr<Common::ServiceStartParams> &params) {
-        auto coordinatorParams = std::dynamic_pointer_cast<Helpers::AsyncCoordinatorStartParams>(params);
-
-        Helpers::AsyncCoordinator *coordinator = nullptr;
-        if (coordinatorParams) { coordinator = coordinatorParams->m_Coordinator; }
-
-        Helpers::AsyncCoordinatorLocker locker(coordinator);
-        Q_UNUSED(locker);
-
-        auto *dbManager = m_CommandManager->getDatabaseManager();
-        m_CachingWorker = new ImageCachingWorker(coordinator, dbManager);
+    void ImageCachingService::startService(Helpers::AsyncCoordinator &coordinator, Storage::IDatabaseManager &dbManager) {
+        m_CachingWorker = new ImageCachingWorker(m_Environment, coordinator, dbManager);
 
         QThread *thread = new QThread();
         m_CachingWorker->moveToThread(thread);
@@ -101,7 +99,7 @@ namespace QMLExtensions {
         this->cacheImage(key, QSize(DEFAULT_THUMB_WIDTH * m_Scale, DEFAULT_THUMB_HEIGHT * m_Scale));
     }
 
-    void ImageCachingService::generatePreviews(const MetadataIO::ArtworksSnapshot &snapshot) {
+    void ImageCachingService::generatePreviews(const Artworks::ArtworksSnapshot &snapshot) {
         if (m_IsCancelled) { return; }
 
         Q_ASSERT(m_CachingWorker != NULL);
@@ -114,13 +112,12 @@ namespace QMLExtensions {
 
         updateDefaultSize();
 
-        for (size_t i = 0; i < size; i++) {
-            auto *artwork = snapshot.get(i);
-            Models::ImageArtwork *imageArtwork = dynamic_cast<Models::ImageArtwork*>(artwork);
+        for (auto &artwork: snapshot) {
+            auto imageArtwork = std::dynamic_pointer_cast<Artworks::ImageArtwork>(artwork);
             if (imageArtwork != nullptr) {
-                requests.emplace_back(new ImageCacheRequest(artwork->getThumbnailPath(),
-                                                            m_DefaultSize,
-                                                            recache));
+                requests.emplace_back(std::make_shared<ImageCacheRequest>(artwork->getThumbnailPath(),
+                                                                          m_DefaultSize,
+                                                                          recache));
             }
         }
 
@@ -140,6 +137,8 @@ namespace QMLExtensions {
     void ImageCachingService::updateDefaultSize() {
         m_DefaultSize.setHeight(DEFAULT_THUMB_HEIGHT * m_Scale);
         m_DefaultSize.setWidth(DEFAULT_THUMB_WIDTH * m_Scale);
+
+        LOG_DEBUG << "Default size is" << m_DefaultSize.height() << "x" << m_DefaultSize.width();
     }
 
     void ImageCachingService::screenChangedHandler(QScreen *screen) {

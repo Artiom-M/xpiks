@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -14,6 +14,7 @@ import QtQuick.Layouts 1.1
 import QtQuick.Dialogs 1.1
 import QtQuick.Controls.Styles 1.1
 import QtGraphicalEffects 1.0
+import xpiks 1.0
 import "../Constants"
 import "../Common.js" as Common;
 import "../Components"
@@ -25,7 +26,7 @@ Item {
     anchors.fill: parent
     property var callbackObject
     property bool initialized: false
-    property var spellCheckSuggestionModel: helpersWrapper.getSpellCheckSuggestionsModel()
+    property var spellCheckSuggestionModel: dispatcher.getCommandTarget(UICommand.ReviewSpellingArtwork)
 
     signal dialogDestruction();
     Component.onDestruction: dialogDestruction();
@@ -35,7 +36,6 @@ Item {
     Keys.onEscapePressed: closePopup()
 
     function closePopup() {
-        spellCheckSuggestionModel.clearModel()
         spellCheckSuggestionsDialog.destroy();
     }
 
@@ -87,7 +87,7 @@ Item {
             anchors.bottomMargin: -glowRadius/2
             glowRadius: 4
             spread: 0.0
-            color: uiColors.defaultControlColor
+            color: uiColors.popupGlowColor
             cornerRadius: glowRadius
         }
 
@@ -121,7 +121,9 @@ Item {
                         text: i18.n + getOriginalText()
 
                         function getOriginalText() {
-                            return spellCheckSuggestionModel.artworksCount === 1 ? qsTr("1 artwork selected") : qsTr("%1 artworks selected").arg(spellCheckSuggestionModel.artworksCount)
+                            return spellCheckSuggestionModel.artworksCount === 1 ?
+                                        qsTr("1 artwork selected") :
+                                        qsTr("%1 artworks selected").arg(spellCheckSuggestionModel.artworksCount)
                         }
                     }
                 }
@@ -213,14 +215,17 @@ Item {
                                         focus: true
 
                                         Repeater {
-                                            model: spellCheckSuggestionModel.getSuggestionItself(delegateIndex)
+                                            model: spellCheckSuggestionModel.getSuggestionObject(delegateIndex)
 
                                             delegate: SuggestionWrapper {
                                                 property int suggestionIndex: index
                                                 itemHeight: uiManager.keywordHeight
                                                 suggestionText: suggestion
                                                 isSelected: isselected
-                                                onActionClicked: editreplacementindex = suggestionIndex
+                                                onActionClicked: {
+                                                    editreplacementindex = suggestionIndex
+                                                    spellCheckSuggestionModel.updateSelection()
+                                                }
                                             }
                                         }
                                     }
@@ -248,10 +253,13 @@ Item {
                     }
 
                     StyledButton {
+                        objectName: "replaceButton"
                         text: i18.n + qsTr("Replace")
+                        enabled: spellCheckSuggestionModel.anythingSelected
+                        isDefault: true
                         width: 100
                         onClicked: {
-                            spellCheckSuggestionModel.submitCorrections()
+                            dispatcher.dispatch(UICommand.FixSpelling, true)
                             closePopup()
                         }
                     }
@@ -259,7 +267,10 @@ Item {
                     StyledButton {
                         text: i18.n + qsTr("Cancel")
                         width: 80
-                        onClicked: closePopup()
+                        onClicked: {
+                            dispatcher.dispatch(UICommand.FixSpelling, false)
+                            closePopup()
+                        }
                     }
                 }
             }

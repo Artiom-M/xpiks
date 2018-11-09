@@ -31,10 +31,16 @@ Please see the [BUILD.md](BUILD.md) file
 
 **How to install**
 
-Please see the [INSTALL.md](INSTALL.md) file
+Provided .deb file is created for *Ubuntu 18* but may work on other debian/Ubuntu derivatives 
+
+Install the .deb file from latest release with all dependencies.
+
+# Special instructions #
+
+Install all recommended packages:
+- libhunspell
+- hunspell-en-us
 
 **How to contribute**
 
 Please see the [CONTRIBUTING.md](https://github.com/ribtoks/xpiks/blob/master/CONTRIBUTING.md) file
-
-If you would like to create packages for other flavors of linux, I can integrated them into this repository as well.

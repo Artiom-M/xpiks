@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -23,62 +23,42 @@ import "../Constants/UIConfig.js" as UIConfig
 
 Rectangle {
     id: artworkEditComponent
+    objectName: "ArtworkEditView"
     color: uiColors.defaultDarkerColor
 
     property variant componentParent
     property var autoCompleteBox
 
-    property int artworkIndex: -1
-    property var keywordsModel
+    property var artworkProxy: dispatcher.getCommandTarget(UICommand.SetupProxyArtworkEdit)
+    property var keywordsModel: artworkProxy.getBasicModelObject()
     property bool wasLeftSideCollapsed
     property bool listViewEnabled: true
     property bool canShowChangesSaved: false
+    property bool showInfo: false
 
     signal dialogDestruction();
     Component.onDestruction: dialogDestruction();
-
-    Keys.onEscapePressed: closePopup()
 
     function onAutoCompleteClose() {
         autoCompleteBox = undefined
     }
 
     function reloadItemEditing(itemIndex) {
-        if (itemIndex === artworkIndex) { return }
+        console.debug("reloadItemEditing # " + itemIndex)
+        if (itemIndex === artworkProxy.proxyIndex) { return }
         if ((itemIndex < 0) || (itemIndex >= rosterListView.count)) { return }
 
         canShowChangesSaved = false
         changesText.visible = false
         closeAutoComplete()
+        flv.submitCurrentKeyword()
 
-        var originalIndex = filteredArtItemsModel.getOriginalIndex(itemIndex)
-        var metadata = filteredArtItemsModel.getArtworkMetadata(itemIndex)
-        var keywordsModel = filteredArtItemsModel.getBasicModel(itemIndex)
-
-        artworkProxy.setSourceArtwork(metadata)
-        artworkProxy.registerAsCurrentItem()
-
-        artworkEditComponent.artworkIndex = itemIndex
-        artworkEditComponent.keywordsModel = keywordsModel
-
-        if (listViewEnabled) {
-            rosterListView.currentIndex = itemIndex
-            rosterListView.positionViewAtIndex(itemIndex, ListView.Contain)
-        }
-
-        titleTextInput.forceActiveFocus()
-        titleTextInput.cursorPosition = titleTextInput.text.length
-
-        artworkProxy.initTitleHighlighting(titleTextInput.textDocument)
-        artworkProxy.initDescriptionHighlighting(descriptionTextInput.textDocument)
-
-        savedTimer.start()
+        dispatcher.dispatch(UICommand.SetupProxyArtworkEdit, itemIndex)
     }
 
     function closePopup() {
         closeAutoComplete()
         artworkProxy.resetModel()
-        uiManager.clearCurrentItem()
         mainStackView.pop({immediate: true})
         restoreLeftPane()
     }
@@ -97,16 +77,6 @@ Rectangle {
         }
     }
 
-    Timer {
-        id: savedTimer
-        interval: 1000
-        running: true
-        repeat: false
-        onTriggered: {
-            canShowChangesSaved = true
-        }
-    }
-
     function updateChangesText() {
         if (canShowChangesSaved) {
             changesText.visible = true
@@ -114,20 +84,10 @@ Rectangle {
     }
 
     function openDuplicatesView() {
-        artworkProxy.setupDuplicatesModel()
-
-        var wasCollapsed = applicationWindow.leftSideCollapsed
-        mainStackView.push({
-                               item: "qrc:/StackViews/DuplicatesReView.qml",
-                               properties: {
-                                   componentParent: applicationWindow,
-                                   wasLeftSideCollapsed: wasCollapsed
-                               },
-                               destroyOnPop: true
-                           })
+        dispatcher.dispatch(UICommand.ReviewDuplicatesSingle, {})
     }
 
-    function openSuggestionView() {
+    function suggestKeywords() {
         var callbackObject = {
             promoteKeywords: function(keywords) {
                 artworkProxy.pasteKeywords(keywords)
@@ -135,18 +95,38 @@ Rectangle {
             }
         }
 
-        artworkProxy.initSuggestion()
-
-        Common.launchDialog("Dialogs/KeywordsSuggestion.qml",
-                            componentParent,
-                            {callbackObject: callbackObject});
+        dispatcher.dispatch(UICommand.InitSuggestionSingle, callbackObject)
     }
 
     function fixSpelling() {
-        artworkProxy.suggestCorrections()
-        Common.launchDialog("Dialogs/SpellCheckSuggestionsDialog.qml",
+        dispatcher.dispatch(UICommand.ReviewSpellingSingle, {})
+        updateChangesText()
+    }
+
+    function editInPlainText() {
+        var callbackObject = {
+            onSuccess: function(text, spaceIsSeparator) {
+                dispatcher.dispatch(UICommand.PlainTextEdit, {
+                                        text: text,
+                                        spaceIsSeparator: spaceIsSeparator})
+            },
+            onClose: function() {
+                flv.activateEdit()
+            }
+        }
+
+        Common.launchDialog("Dialogs/PlainTextKeywordsDialog.qml",
                             componentParent,
-                            {})
+                            {
+                                callbackObject: callbackObject,
+                                keywordsText: artworkProxy.getKeywordsString(),
+                                keywordsModel: artworkProxy.getBasicModelObject()
+                            });
+    }
+
+    function clearKeywords() {
+        filteredArtworksListModel.clearKeywords(artworkProxy.proxyIndex)
+        artworkProxy.updateKeywords()
         updateChangesText()
     }
 
@@ -166,7 +146,7 @@ Rectangle {
         MenuItem {
             visible: wordRightClickMenu.showAddToDict
             text: i18.n + qsTr("Add \"%1\" to dictionary").arg(wordRightClickMenu.word)
-            onTriggered: spellCheckService.addWordToUserDictionary(wordRightClickMenu.word);
+            onTriggered: dispatcher.dispatch(UICommand.AddToUserDictionary, wordRightClickMenu.word)
         }
 
         Menu {
@@ -247,10 +227,7 @@ Rectangle {
 
         MenuItem {
             text: i18.n + qsTr("Copy to Quick Buffer")
-            onTriggered: {
-                filteredArtItemsModel.copyToQuickBuffer(itemPreviewMenu.index)
-                uiManager.activateQuickBufferTab()
-            }
+            onTriggered: dispatcher.dispatch(UICommand.CopyArtworkToQuickBuffer, itemPreviewMenu.index)
         }
     }
 
@@ -261,7 +238,7 @@ Rectangle {
         MenuItem {
             text: i18.n + qsTr("Suggest keywords")
             onTriggered: {
-                openSuggestionView()
+                suggestKeywords()
             }
         }
 
@@ -284,16 +261,15 @@ Rectangle {
         MenuItem {
             text: i18.n + qsTr("Show duplicates")
             enabled: artworkEditComponent.keywordsModel ? artworkEditComponent.keywordsModel.hasDuplicates : false
-            onTriggered: {
-                openDuplicatesView()
-            }
+            onTriggered: openDuplicatesView()
         }
 
         MenuSeparator { }
 
         MenuItem {
             text: i18.n + qsTr("Copy")
-            enabled: keywordsMoreMenu.keywordsCount > 0
+            enabled: artworkProxy.keywordsCount > 0
+            objectName: "copyMenuItem"
             onTriggered: {
                 clipboard.setText(artworkProxy.getKeywordsString())
             }
@@ -312,22 +288,7 @@ Rectangle {
         MenuItem {
             text: i18.n + qsTr("Edit in plain text")
             onTriggered: {
-                var callbackObject = {
-                    onSuccess: function(text, spaceIsSeparator) {
-                        artworkProxy.plainTextEdit(text, spaceIsSeparator)
-                    },
-                    onClose: function() {
-                        flv.activateEdit()
-                    }
-                }
-
-                Common.launchDialog("Dialogs/PlainTextKeywordsDialog.qml",
-                                    applicationWindow,
-                                    {
-                                        callbackObject: callbackObject,
-                                        keywordsText: artworkProxy.getKeywordsString(),
-                                        keywordsModel: artworkProxy.getBasicModel()
-                                    });
+                editInPlainText()
             }
         }
 
@@ -340,19 +301,71 @@ Rectangle {
         }
     }
 
+    UICommandListener {
+        commandDispatcher: dispatcher
+        commandIDs: [UICommand.SetupProxyArtworkEdit]
+        onDispatched: {
+            console.log("# [EditArtwork] dispatched")
+            artworkEditComponent.keywordsModel = artworkProxy.getBasicModelObject()
+
+            if (listViewEnabled) {
+                rosterListView.currentIndex = value
+                rosterListView.positionViewAtIndex(value, ListView.Contain)
+            }
+
+            titleTextInput.forceActiveFocus()
+            titleTextInput.cursorPosition = titleTextInput.text.length
+
+            uiManager.initTitleHighlighting(artworkProxy.getBasicModelObject(), titleTextInput.textDocument)
+            uiManager.initDescriptionHighlighting(artworkProxy.getBasicModelObject(), descriptionTextInput.textDocument)
+
+            savedTimer.start()
+        }
+    }
+
+    Timer {
+        id: savedTimer
+        interval: 1000
+        running: true
+        repeat: false
+        onTriggered: {
+            canShowChangesSaved = true
+        }
+    }
+
+    Keys.onPressed: {
+        var withMeta = (event.modifiers & Qt.ControlModifier) ||
+                (event.modifiers & Qt.MetaModifier);
+        var withAlt = (event.modifiers & Qt.AltModifier);
+
+        if ((event.key === Qt.Key_Left) && (withMeta && withAlt)) {
+            reloadItemEditing(rosterListView.currentIndex - 1)
+            event.accepted = true;
+        }
+
+        if ((event.key === Qt.Key_Right) && (withMeta && withAlt)) {
+            reloadItemEditing(rosterListView.currentIndex + 1)
+            event.accepted = true;
+        }
+    }
+
+    Keys.onEscapePressed: closePopup()
+
     Component.onCompleted: {
         focus = true
 
-        artworkProxy.registerAsCurrentItem()
         titleTextInput.forceActiveFocus()
         titleTextInput.cursorPosition = titleTextInput.text.length
+
+        if (showInfo) {
+            editTabView.setCurrentIndex(1)
+        }
     }
 
     Connections {
-        target: helpersWrapper
+        target: xpiksApp
         onGlobalBeforeDestruction: {
             console.debug("UI:EditArtworkHorizontalDialog # globalBeforeDestruction")
-
             artworkProxy.resetModel()
         }
     }
@@ -366,21 +379,16 @@ Rectangle {
 
     MessageDialog {
         id: clearKeywordsDialog
-
         title: i18.n + qsTr("Confirmation")
         text: i18.n + qsTr("Clear all keywords?")
         standardButtons: StandardButton.Yes | StandardButton.No
-        onYes: {
-            filteredArtItemsModel.clearKeywords(artworkEditComponent.artworkIndex)
-            artworkProxy.updateKeywords()
-            updateChangesText()
-        }
+        onYes: clearKeywords()
     }
 
     // Keys.onEscapePressed: closePopup()
 
     Connections {
-        target: artworkProxy
+        target: acSource
 
         onCompletionsAvailable: {
             acSource.initializeCompletions()
@@ -403,7 +411,7 @@ Rectangle {
             var isBelow = (tmp.y + popupHeight) < directParent.height;
 
             var options = {
-                model: acSource.getCompletionsModel(),
+                model: acSource.getCompletionsModelObject(),
                 autoCompleteSource: acSource,
                 editableTags: flv,
                 isBelowEdit: isBelow,
@@ -440,7 +448,7 @@ Rectangle {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: 2
-        color: applicationWindow.leftSideCollapsed ? bottomPane.color : artworkEditComponent.color
+        color: appHost.leftSideCollapsed ? bottomPane.color : artworkEditComponent.color
     }
 
     SplitView {
@@ -483,6 +491,7 @@ Rectangle {
                     spacing: 0
 
                     BackGlyphButton {
+                        objectName: "backButton"
                         text: i18.n + qsTr("Back")
                         onClicked: {
                             flv.onBeforeClose()
@@ -532,30 +541,37 @@ Rectangle {
                     anchors.fill: parent
                     anchors.leftMargin: imageWrapper.imageMargin
                     anchors.topMargin: imageWrapper.imageMargin
+                    flickableItem.interactive: previewImage.isFullSize
 
                     Image {
                         id: previewImage
                         source: "image://global/" + artworkProxy.thumbPath
                         cache: false
                         property bool isFullSize: false
-                        width: isFullSize ? sourceSize.width : (imageWrapper.width - 2*imageWrapper.imageMargin)
-                        height: isFullSize ? sourceSize.height : (imageWrapper.height - 2*imageWrapper.imageMargin)
+                        width: {
+                            var fullWidth = sourceSize.width
+                            var fitWidth = (imageWrapper.width - 2*imageWrapper.imageMargin)
+
+                            if (isFullSize) {
+                                return Math.max(fullWidth, fitWidth)
+                            } else {
+                                return fitWidth
+                            }
+                        }
+                        height: {
+                            var fullHeight = sourceSize.height
+                            var fitHeight = (imageWrapper.height - 2*imageWrapper.imageMargin)
+
+                            if (isFullSize) {
+                                return Math.max(fullHeight, fitHeight)
+                            } else {
+                                return fitHeight
+                            }
+                        }
                         fillMode: Image.PreserveAspectFit
                         anchors.centerIn: parent
                         asynchronous: true
                     }
-                }
-
-                Image {
-                    id: videoTypeIcon
-                    visible: (artworkProxy.isVideo) && (previewImage.status == Image.Ready)
-                    enabled: artworkProxy.isVideo
-                    source: "qrc:/Graphics/video-icon.svg"
-                    fillMode: Image.PreserveAspectCrop
-                    sourceSize.width: 225
-                    sourceSize.height: 225
-                    anchors.centerIn: imageWrapper
-                    cache: true
                 }
 
                 Rectangle {
@@ -591,6 +607,7 @@ Rectangle {
             //width: 300
             anchors.top: parent.top
             anchors.bottom: parent.bottom
+            property bool isWideEnough: width > 350
 
             Component.onCompleted: {
                 rightPane.width = uiManager.artworkEditRightPaneWidth
@@ -724,6 +741,7 @@ Rectangle {
 
                                 StyledTextEdit {
                                     id: titleTextInput
+                                    objectName: "titleTextInput"
                                     focus: true
                                     width: paintedWidth > titleFlick.width ? paintedWidth : titleFlick.width
                                     height: titleFlick.height
@@ -765,19 +783,23 @@ Rectangle {
                                     }
 
                                     Component.onCompleted: {
-                                        artworkProxy.initTitleHighlighting(titleTextInput.textDocument)
+                                        uiManager.initTitleHighlighting(
+                                                    artworkProxy.getBasicModelObject(),
+                                                    titleTextInput.textDocument)
                                     }
 
                                     onCursorRectangleChanged: titleFlick.ensureVisible(cursorRectangle)
 
                                     Keys.onPressed: {
-                                        if(event.matches(StandardKey.Paste)) {
+                                        if (event.matches(StandardKey.Paste)) {
                                             var clipboardText = clipboard.getText();
                                             if (Common.safeInsert(titleTextInput, clipboardText)) {
                                                 event.accepted = true
                                             }
                                         } else if ((event.key === Qt.Key_Return) || (event.key === Qt.Key_Enter)) {
                                             event.accepted = true
+                                        } else {
+                                            event.accepted = false
                                         }
                                     }
                                 }
@@ -850,6 +872,7 @@ Rectangle {
 
                                 StyledTextEdit {
                                     id: descriptionTextInput
+                                    objectName: "descriptionTextInput"
                                     width: descriptionFlick.width
                                     height: paintedHeight > descriptionFlick.height ? paintedHeight : descriptionFlick.height
                                     text: artworkProxy.description
@@ -888,7 +911,9 @@ Rectangle {
                                     textFormat: TextEdit.PlainText
 
                                     Component.onCompleted: {
-                                        artworkProxy.initDescriptionHighlighting(descriptionTextInput.textDocument)
+                                        uiManager.initDescriptionHighlighting(
+                                                    artworkProxy.getBasicModelObject(),
+                                                    descriptionTextInput.textDocument)
                                     }
 
                                     Keys.onBacktabPressed: {
@@ -958,6 +983,7 @@ Rectangle {
                             anchors.left: parent.left
                             anchors.right: parent.right
                             color: uiColors.inputBackgroundColor
+                            state: ""
 
                             function removeKeyword(index) {
                                 artworkProxy.removeKeywordAt(index)
@@ -970,8 +996,12 @@ Rectangle {
                             }
 
                             function appendKeyword(keyword) {
-                                artworkProxy.appendKeyword(keyword)
-                                updateChangesText()
+                                if (artworkProxy.appendKeyword(keyword)) {
+                                    updateChangesText()
+                                } else {
+                                    keywordsWrapper.state = "blinked"
+                                    blinkTimer.start()
+                                }
                             }
 
                             function pasteKeywords(keywords) {
@@ -986,23 +1016,26 @@ Rectangle {
 
                             EditableTags {
                                 id: flv
+                                objectName: "editableTags"
                                 anchors.fill: parent
                                 model: artworkEditComponent.keywordsModel
                                 property int keywordHeight: uiManager.keywordHeight
                                 scrollStep: keywordHeight
                                 populateAnimationEnabled: false
+                                property int droppedIndex: -1
+                                onDroppedIndexChanged: dropTimer.start()
 
                                 function acceptCompletion(completionID) {
-                                    var accepted = artworkProxy.acceptCompletionAsPreset(completionID);
-                                    if (!accepted) {
+                                    if (acSource.isPreset(completionID)) {
+                                        dispatcher.dispatch(UICommand.AcceptPresetCompletionForSingle, completionID)
+                                        flv.editControl.acceptCompletion('')
+                                    } else {
                                         var completion = acSource.getCompletion(completionID)
                                         flv.editControl.acceptCompletion(completion)
-                                    } else {
-                                        flv.editControl.acceptCompletion('')
                                     }
                                 }
 
-                                delegate: KeywordWrapper {
+                                delegate: DraggableKeywordWrapper {
                                     id: kw
                                     isHighlighted: true
                                     keywordText: keyword
@@ -1011,6 +1044,9 @@ Rectangle {
                                     delegateIndex: index
                                     itemHeight: flv.keywordHeight
                                     onRemoveClicked: keywordsWrapper.removeKeyword(delegateIndex)
+                                    dragDropAllowed: switcher.keywordsDragDropEnabled
+                                    dragParent: flv
+                                    wasDropped: flv.droppedIndex == delegateIndex
                                     onActionDoubleClicked: {
                                         var callbackObject = {
                                             onSuccess: function(replacement) {
@@ -1028,7 +1064,7 @@ Rectangle {
                                                                 callbackObject: callbackObject,
                                                                 previousKeyword: keyword,
                                                                 keywordIndex: kw.delegateIndex,
-                                                                keywordsModel: artworkProxy.getBasicModel()
+                                                                keywordsModel: artworkProxy.getBasicModelObject()
                                                             })
                                     }
 
@@ -1040,6 +1076,18 @@ Rectangle {
                                         wordRightClickMenu.showExpandPreset = (filteredPresetsModel.getItemsCount() !== 0 )
                                         wordRightClickMenu.keywordIndex = kw.delegateIndex
                                         wordRightClickMenu.popupIfNeeded()
+                                    }
+
+                                    onMoveRequested: {
+                                        if (from !== to) {
+                                            flv.droppedIndex = to
+                                        }
+
+                                        if (artworkProxy.moveKeyword(from, to)) {
+                                            console.debug("Just dropped to " + to)
+                                        } else {
+                                            flv.droppedIndex = -1
+                                        }
                                     }
                                 }
 
@@ -1061,7 +1109,7 @@ Rectangle {
                                 }
 
                                 onCompletionRequested: {
-                                    artworkProxy.generateCompletions(prefix)
+                                    dispatcher.dispatch(UICommand.GenerateCompletions, prefix)
                                 }
 
                                 onExpandLastAsPreset: {
@@ -1080,6 +1128,30 @@ Rectangle {
                                 anchors.rightMargin: -15
                                 flickable: flv
                             }
+
+                            Timer {
+                                id: blinkTimer
+                                repeat: false
+                                interval: 400
+                                triggeredOnStart: false
+                                onTriggered: keywordsWrapper.state = ""
+                            }
+
+                            Timer {
+                                id: dropTimer
+                                repeat: false
+                                interval: 1000
+                                triggeredOnStart: false
+                                onTriggered: flv.droppedIndex = -1
+                            }
+
+                            states: State {
+                                name: "blinked";
+                                PropertyChanges {
+                                    target: keywordsWrapper;
+                                    border.width: 0
+                                }
+                            }
                         }
 
                         Item {
@@ -1093,6 +1165,7 @@ Rectangle {
 
                             StyledLink {
                                 id: fixSpellingLink
+                                objectName: "fixSpellingLink"
                                 text: i18.n + qsTr("Fix spelling")
                                 property bool canBeShown: {
                                     return artworkEditComponent.keywordsModel ?
@@ -1131,11 +1204,11 @@ Rectangle {
 
                             StyledLink {
                                 id: suggestLink
-                                property bool canBeShown: artworkProxy.keywordsCount < warningsModel.minKeywordsCount
+                                property bool canBeShown: (artworkProxy.keywordsCount < warningsModel.minKeywordsCount) || rightPane.isWideEnough
                                 visible: canBeShown
                                 enabled: canBeShown
                                 text: i18.n + qsTr("Suggest keywords")
-                                onClicked: { openSuggestionView() }
+                                onClicked: { suggestKeywords() }
                             }
 
                             StyledText {
@@ -1147,7 +1220,8 @@ Rectangle {
 
                             StyledLink {
                                 id: copyLink
-                                property bool canBeShown: (artworkProxy.keywordsCount > 0) && (!fixSpellingLink.canBeShown) && (!removeDuplicatesText.canBeShown)
+                                objectName: "copyLink"
+                                property bool canBeShown: (artworkProxy.keywordsCount > 0)
                                 text: i18.n + qsTr("Copy")
                                 enabled: canBeShown
                                 visible: canBeShown
@@ -1161,6 +1235,22 @@ Rectangle {
                                 verticalAlignment: Text.AlignVCenter
                             }
 
+                            StyledLink {
+                                id: clearLink
+                                property bool canBeShown: (artworkProxy.keywordsCount > 0)
+                                text: i18.n + qsTr("Clear")
+                                enabled: canBeShown
+                                visible: canBeShown
+                                onClicked: clearKeywordsDialog.open()
+                            }
+
+                            StyledText {
+                                enabled: clearLink.canBeShown
+                                visible: clearLink.canBeShown
+                                text: "|"
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
                             Item {
                                 width: childrenRect.width
                                 height: moreLink.height
@@ -1168,7 +1258,10 @@ Rectangle {
 
                                 StyledText {
                                     id: moreLink
-                                    color: enabled ? (moreMA.pressed ? uiColors.linkClickedColor : uiColors.artworkActiveColor) : (isActive ? uiColors.labelActiveForeground : uiColors.labelInactiveForeground)
+                                    color: enabled ? (moreMA.pressed ? uiColors.linkClickedColor :
+                                                                       uiColors.artworkActiveColor) :
+                                                     (isActive ? uiColors.labelActiveForeground :
+                                                                 uiColors.labelInactiveForeground)
                                     text: i18.n + qsTr("More")
                                     anchors.verticalCenter: parent.verticalCenter
                                     // \u25BE - triangle
@@ -1265,6 +1358,7 @@ Rectangle {
 
         Item {
             id: selectPrevButton
+            objectName: "selectPrevButton"
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.bottom: parent.bottom
@@ -1304,6 +1398,7 @@ Rectangle {
 
         ListView {
             id: rosterListView
+            objectName: "rosterListView"
             enabled: listViewEnabled
             boundsBehavior: Flickable.StopAtBounds
             orientation: ListView.Horizontal
@@ -1311,7 +1406,7 @@ Rectangle {
             anchors.right: selectNextButton.left
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            model: listViewEnabled ? filteredArtItemsModel : undefined
+            model: listViewEnabled ? filteredArtworksListModel : undefined
             highlightFollowsCurrentItem: false
             highlightMoveDuration: 0
             flickableDirection: Flickable.HorizontalFlick
@@ -1322,14 +1417,15 @@ Rectangle {
 
             Component.onCompleted: {
                 if (listViewEnabled) {
-                    rosterListView.currentIndex = artworkEditComponent.artworkIndex
-                    rosterListView.positionViewAtIndex(artworkEditComponent.artworkIndex, ListView.Contain)
+                    rosterListView.currentIndex = artworkProxy.proxyIndex
+                    rosterListView.positionViewAtIndex(artworkProxy.proxyIndex, ListView.Contain)
                     // TODO: fix bug with ListView.Center
                 }
             }
 
             delegate: Rectangle {
                 id: cellItem
+                objectName: "rosterDelegateItem"
                 property int delegateIndex: index
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
@@ -1362,28 +1458,25 @@ Rectangle {
                     cache: false
                 }
 
-                Image {
-                    id: videoTypeIconSmall
-                    visible: isvideo
-                    enabled: isvideo
-                    source: "qrc:/Graphics/video-icon-s.png"
-                    fillMode: Image.PreserveAspectFit
-                    sourceSize.width: 150
-                    sourceSize.height: 150
-                    anchors.fill: artworkImage
-                    cache: true
-                }
-
-                Image {
-                    id: imageTypeIcon
-                    visible: hasvectorattached
-                    enabled: hasvectorattached
-                    source: "qrc:/Graphics/vector-icon.svg"
-                    sourceSize.width: 20
-                    sourceSize.height: 20
-                    anchors.left: artworkImage.left
+                Rectangle {
+                    anchors.right: artworkImage.right
                     anchors.bottom: artworkImage.bottom
-                    cache: true
+                    width: 20
+                    height: 20
+                    color: uiColors.defaultDarkColor
+                    property bool isVideo: isvideo
+                    property bool isVector: hasvectorattached
+                    visible: isVideo || isVector
+                    enabled: isVideo || isVector
+
+                    Image {
+                        id: typeIcon
+                        anchors.fill: parent
+                        source: parent.isVector ? "qrc:/Graphics/vector-icon.svg" : (parent.isVideo ? "qrc:/Graphics/video-icon.svg" : "")
+                        sourceSize.width: 20
+                        sourceSize.height: 20
+                        cache: true
+                    }
                 }
 
                 MouseArea {
@@ -1429,6 +1522,7 @@ Rectangle {
 
         Item {
             id: selectNextButton
+            objectName: "selectNextButton"
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.bottom: parent.bottom

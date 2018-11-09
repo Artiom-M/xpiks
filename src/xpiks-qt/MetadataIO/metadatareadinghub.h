@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,32 +11,49 @@
 #ifndef METADATAREADINGHUB_H
 #define METADATAREADINGHUB_H
 
+#include <memory>
+
 #include <QObject>
-#include <QAtomicInt>
-#include "../Common/readerwriterqueue.h"
-#include "artworkssnapshot.h"
-#include "originalmetadata.h"
-#include "../Helpers/asynccoordinator.h"
-#include "../Common/baseentity.h"
+#include <QString>
+#include <QtGlobal>
+
+#include "Artworks/artworkssnapshot.h"
+#include "Common/readerwriterqueue.h"
+#include "Helpers/asynccoordinator.h"
+
+namespace Services {
+    class ArtworksEditingHub;
+    class ArtworksUpdateHub;
+}
 
 namespace MetadataIO {
-    class MetadataReadingHub: public QObject, public Common::BaseEntity
+    class MetadataIOService;
+    struct OriginalMetadata;
+
+    class MetadataReadingHub: public QObject
     {
         Q_OBJECT
     public:
-        MetadataReadingHub();
+        MetadataReadingHub(MetadataIOService &metadataIOService,
+                           Services::ArtworksUpdateHub &updateHub,
+                           Services::ArtworksEditingHub &inspectionHub);
 
     public:
-        void initializeImport(const ArtworksSnapshot &artworksToRead, int importID, quint32 storageReadBatchID);
+        Artworks::ArtworksSnapshot const &getSnapshot() const { return m_ArtworksToRead; }
+
+    public:
+        void initializeImport(Artworks::ArtworksSnapshot const &artworksToRead, int importID, quint32 storageReadBatchID);
         void finalizeImport();
 
     public:
-        Helpers::AsyncCoordinator *getCoordinator() { return &m_AsyncCoordinator; }
-        const ArtworksSnapshot &getSnapshot() const { return m_ArtworksToRead; }
+        void accountReadIO();
+        void startAcceptingIOResults();
+        std::shared_ptr<Helpers::AsyncCoordinatorUnlocker> getIOFinalizer();
 
     public:
         void proceedImport(bool ignoreBackups);
-        void cancelImport();
+        void cancelImport(bool ignoreBackups);
+        void skipImport();
 
     public:
         void push(std::shared_ptr<OriginalMetadata> &item);
@@ -48,16 +65,19 @@ namespace MetadataIO {
         void readingFinished(int importID);
 
     private:
-        void initializeArtworks(bool ignoreBackups, bool initEmpty);
+        void initializeArtworks(bool ignoreBackups, bool isCancelled);
 
     private:
-        ArtworksSnapshot m_ArtworksToRead;
+        Artworks::ArtworksSnapshot m_ArtworksToRead;
         Helpers::AsyncCoordinator m_AsyncCoordinator;
+        MetadataIOService &m_MetadataIOService;
+        Services::ArtworksUpdateHub &m_UpdateHub;
+        Services::ArtworksEditingHub &m_InspectionHub;
         Common::ReaderWriterQueue<OriginalMetadata> m_ImportQueue;
         int m_ImportID;
         quint32 m_StorageReadBatchID;
         volatile bool m_IgnoreBackupsAtImport;
-        volatile bool m_InitAsEmpty;
+        volatile bool m_IsCancelled;
     };
 }
 

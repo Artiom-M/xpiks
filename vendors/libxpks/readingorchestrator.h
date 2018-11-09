@@ -1,19 +1,16 @@
 #ifndef READINGORCHESTRATOR_H
 #define READINGORCHESTRATOR_H
 
-#include <QObject>
-#include <QVector>
-#include <QMutex>
-#include <QHash>
-
-namespace Models {
-    class ArtworkMetadata;
-    class SettingsModel;
+namespace Artworks {
+    class ArtworksSnapshot;
 }
 
 namespace MetadataIO {
     class MetadataReadingHub;
-    class ArtworksSnapshot;
+}
+
+namespace Models {
+    class SettingsModel;
 }
 
 namespace libxpks {
@@ -21,8 +18,8 @@ namespace libxpks {
         class ReadingOrchestrator
         {
         public:
-            explicit ReadingOrchestrator(MetadataIO::MetadataReadingHub *readingHub,
-                                         Models::SettingsModel *settingsModel);
+            explicit ReadingOrchestrator(MetadataIO::MetadataReadingHub &readingHub,
+                                         Models::SettingsModel &settingsModel);
             virtual ~ReadingOrchestrator();
 
         public:
@@ -33,9 +30,9 @@ namespace libxpks {
             void startReadingVideos();
 
         private:
-            const MetadataIO::ArtworksSnapshot &m_ItemsToReadSnapshot;
-            MetadataIO::MetadataReadingHub *m_ReadingHub;
-            Models::SettingsModel *m_SettingsModel;
+            Artworks::ArtworksSnapshot const &m_ItemsToReadSnapshot;
+            MetadataIO::MetadataReadingHub &m_ReadingHub;
+            Models::SettingsModel &m_SettingsModel;
         };
     }
 }

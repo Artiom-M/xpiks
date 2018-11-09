@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,16 +9,23 @@
  */
 
 #include "presetgroupsmodel.h"
+
+#include <QByteArray>
+#include <QModelIndex>
 #include <QQmlEngine>
-#include "../Common/defines.h"
-#include "presetkeywordsmodelconfig.h"
-#include "presetkeywordsmodel.h"
+#include <QReadLocker>
+#include <QWriteLocker>
+#include <QtDebug>
+
+#include "Common/logging.h"
+#include "KeywordsPresets/groupmodel.h"
+#include "KeywordsPresets/presetkeywordsmodel.h"
+#include "KeywordsPresets/presetkeywordsmodelconfig.h"
 
 namespace KeywordsPresets {
-    PresetGroupsModel::PresetGroupsModel(PresetKeywordsModel *presetsModel):
+    PresetGroupsModel::PresetGroupsModel(PresetKeywordsModel &presetsModel):
         m_PresetsModel(presetsModel)
     {
-        Q_ASSERT(presetsModel != nullptr);
     }
 
     bool PresetGroupsModel::tryGetGroupIndexById(int groupID, size_t &index) {
@@ -149,11 +156,10 @@ namespace KeywordsPresets {
         }
 
         Q_ASSERT(m_GroupsList.size() == m_FilteredGroups.size());
-        Q_ASSERT(m_PresetsModel != nullptr);
 
         if (!m_FilteredGroups[index]) {
-            m_FilteredGroups[index].reset(new PresetKeywordsGroupModel(m_GroupsList[index].m_GroupID));
-            m_FilteredGroups[index]->setSourceModel(m_PresetsModel);
+            m_FilteredGroups[index] = std::make_shared<PresetKeywordsGroupModel>(
+                                          m_GroupsList[index].m_GroupID, m_PresetsModel);
         }
 
         QObject *result = m_FilteredGroups[index].get();
@@ -163,11 +169,9 @@ namespace KeywordsPresets {
 
     QObject *PresetGroupsModel::getDefaultGroupModel() {
         LOG_DEBUG << "#";
-        Q_ASSERT(m_PresetsModel != nullptr);
 
         if (!m_DefaultGroup) {
-            m_DefaultGroup.reset(new PresetKeywordsGroupModel(DEFAULT_GROUP_ID));
-            m_DefaultGroup->setSourceModel(m_PresetsModel);
+            m_DefaultGroup = std::make_shared<PresetKeywordsGroupModel>(DEFAULT_GROUP_ID, m_PresetsModel);
         }
 
         QObject *result = m_DefaultGroup.get();

@@ -9,19 +9,31 @@
  */
 
 #include "metadatareadingworker.h"
+
+#include <cstddef>
+#include <memory>
+
+#include <QChar>
+#include <QDateTime>
+#include <QDebug>
+#include <QFileInfo>
+#include <QImageReader>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonArray>
-#include <QFile>
-#include <QDir>
+#include <QJsonValue>
+#include <QLatin1String>
+#include <QSize>
 #include <QTemporaryFile>
-#include <QImageReader>
-#include <Models/settingsmodel.h>
-#include <Models/artworkmetadata.h>
-#include <Helpers/asynccoordinator.h>
-#include <MetadataIO/metadatareadinghub.h>
-#include <Helpers/constants.h>
-#include <Common/defines.h>
+#include <Qt>
+#include <QtGlobal>
+
+#include "Artworks/artworkmetadata.h"
+#include "Artworks/artworkssnapshot.h"
+#include "Common/logging.h"
+#include "MetadataIO/metadatareadinghub.h"
+#include "MetadataIO/originalmetadata.h"
+#include "Models/settingsmodel.h"
 
 #ifdef Q_OS_WIN
 #define _X86_
@@ -145,17 +157,15 @@ namespace libxpks {
             }
         }
 
-        ExiftoolImageReadingWorker::ExiftoolImageReadingWorker(const MetadataIO::ArtworksSnapshot &artworksToRead,
-                                                               Models::SettingsModel *settingsModel,
-                                                               MetadataIO::MetadataReadingHub *readingHub):
+        ExiftoolImageReadingWorker::ExiftoolImageReadingWorker(Artworks::ArtworksSnapshot const &artworksToRead,
+                                                               Models::SettingsModel &settingsModel,
+                                                               MetadataIO::MetadataReadingHub &readingHub):
             m_ItemsToReadSnapshot(artworksToRead),
             m_ReadingHub(readingHub),
             m_ExiftoolProcess(nullptr),
             m_SettingsModel(settingsModel),
             m_ReadSuccess(false)
         {
-            Q_ASSERT(readingHub != nullptr);
-            Q_ASSERT(settingsModel != nullptr);
             Q_ASSERT(!m_ItemsToReadSnapshot.empty());
         }
 
@@ -164,9 +174,7 @@ namespace libxpks {
         }
 
         void ExiftoolImageReadingWorker::process() {
-            auto *asyncCoordinator = m_ReadingHub->getCoordinator();
-            Helpers::AsyncCoordinatorUnlocker unlocker(asyncCoordinator);
-
+            auto unlocker = m_ReadingHub.getIOFinalizer();
             Q_UNUSED(unlocker);
 
             bool success = false;
@@ -200,7 +208,7 @@ namespace libxpks {
 #endif
                 argumentsFile.close();
 
-                QString exiftoolPath = m_SettingsModel->getExifToolPath();
+                QString exiftoolPath = m_SettingsModel.getExifToolPath();
                 QStringList arguments;
 #ifdef Q_OS_WIN
                 arguments << "-charset" << "FileName=UTF8";
@@ -273,8 +281,8 @@ namespace libxpks {
             arguments << "-ImageWidth" << "-ImageHeight";
             size_t size = m_ItemsToReadSnapshot.size();
             for (size_t i = 0; i < size; ++i) {
-                Models::ArtworkMetadata *metadata = m_ItemsToReadSnapshot.get(i);
-                arguments << metadata->getFilepath();
+                auto &artwork = m_ItemsToReadSnapshot.get(i);
+                arguments << artwork->getFilepath();
             }
 
             return arguments;
@@ -302,7 +310,7 @@ namespace libxpks {
                         QFileInfo fi(result->m_FilePath);
                         result->m_FileSize = fi.size();
 
-                        m_ReadingHub->push(result);
+                        m_ReadingHub.push(result);
 
                         LOG_DEBUG << "Parsed file:" << result->m_FilePath;
                     }

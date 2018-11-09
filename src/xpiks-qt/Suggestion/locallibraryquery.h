@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -12,9 +12,11 @@
 #define LOCALLIBRARYQUERY_H
 
 #include <QObject>
+#include <QString>
 #include <QVector>
-#include "searchquery.h"
-#include "../MetadataIO/cachedartwork.h"
+
+#include "MetadataIO/cachedartwork.h"
+#include "Microstocks/searchquery.h"
 
 namespace Suggestion {
     class LocalLibraryQuery: public QObject {
@@ -25,8 +27,8 @@ namespace Suggestion {
         { }
 
     public:
-        void setSearchQuery(const SearchQuery &value) { m_SearchQuery = value; }
-        const SearchQuery &getSearchQuery() const { return m_SearchQuery; }
+        void setSearchQuery(const Microstocks::SearchQuery &value) { m_SearchQuery = value; }
+        const Microstocks::SearchQuery &getSearchQuery() const { return m_SearchQuery; }
         QVector<MetadataIO::CachedArtwork> &getResults() { return m_Results; }
 
     public:
@@ -40,7 +42,7 @@ namespace Suggestion {
 
     private:
         QVector<MetadataIO::CachedArtwork> m_Results;
-        SearchQuery m_SearchQuery;
+        Microstocks::SearchQuery m_SearchQuery;
     };
 }
 

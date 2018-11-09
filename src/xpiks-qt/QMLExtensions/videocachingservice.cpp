@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,29 +9,43 @@
  */
 
 #include "videocachingservice.h"
-#include <vector>
+
+#include <cstddef>
 #include <memory>
-#include "videocachingworker.h"
-#include "../Models/videoartwork.h"
-#include "../QMLExtensions/videocacherequest.h"
-#include "../Commands/commandmanager.h"
-#include "../Models/switchermodel.h"
-#include "../Common/defines.h"
+#include <vector>
+
+#include <QThread>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Artworks/artworkssnapshot.h"
+#include "Artworks/videoartwork.h"
+#include "Common/logging.h"
+#include "Models/switchermodel.h"
+#include "QMLExtensions/videocacherequest.h"
+#include "QMLExtensions/videocachingworker.h"
 
 namespace QMLExtensions {
-    VideoCachingService::VideoCachingService(QObject *parent) :
+    VideoCachingService::VideoCachingService(Common::ISystemEnvironment &environment,
+                                             Models::SwitcherModel &switcherModel,
+                                             QObject *parent) :
         QObject(parent),
-        Common::BaseEntity(),
+        m_Environment(environment),
+        m_SwitcherModel(switcherModel),
         m_CachingWorker(nullptr),
         m_IsCancelled(false)
     {
     }
 
-    void VideoCachingService::startService() {
-        Helpers::DatabaseManager *dbManager = m_CommandManager->getDatabaseManager();
-
-        m_CachingWorker = new VideoCachingWorker(dbManager);
-        m_CachingWorker->setCommandManager(m_CommandManager);
+    void VideoCachingService::startService(ImageCachingService &imageCachingService,
+                                           Services::ArtworksUpdateHub &updateHub,
+                                           MetadataIO::MetadataIOService &metadataIOService,
+                                           Storage::IDatabaseManager &dbManager) {
+        m_CachingWorker = new VideoCachingWorker(m_Environment,
+                                                 dbManager,
+                                                 imageCachingService,
+                                                 updateHub,
+                                                 metadataIOService);
 
         QThread *thread = new QThread();
         m_CachingWorker->moveToThread(thread);
@@ -49,43 +63,61 @@ namespace QMLExtensions {
     void VideoCachingService::stopService() {
         LOG_DEBUG << "#";
 
-        if (m_CachingWorker != NULL) {
+        if (m_CachingWorker != nullptr) {
             m_IsCancelled = true;
             m_CachingWorker->stopWorking();
         } else {
-            LOG_WARNING << "Caching Worker was NULL";
+            LOG_WARNING << "Caching Worker was nullptr";
         }
     }
 
-    void VideoCachingService::generateThumbnails(const MetadataIO::ArtworksSnapshot &snapshot) {
+    void VideoCachingService::generateThumbnails(const Artworks::ArtworksSnapshot &snapshot) {
         Q_ASSERT(m_CachingWorker != nullptr);
         LOG_INFO << snapshot.size() << "artworks";
 
 #ifndef INTEGRATION_TESTS
-        Models::SwitcherModel *switcher = m_CommandManager->getSwitcherModel();
-        const bool goodQualityAllowed = switcher->getGoodQualityVideoPreviews();
+        const bool goodQualityAllowed = m_SwitcherModel.getGoodQualityVideoPreviews();
 #else
         const bool goodQualityAllowed = false;
 #endif
+        LOG_DEBUG << (goodQualityAllowed ? "Good" : "Quick") << "quality allowed";
 
         const size_t size = snapshot.size();
         std::vector<std::shared_ptr<VideoCacheRequest> > requests;
         requests.reserve(size);
 
-        for (size_t i = 0; i < size; i++) {
-            auto *artwork = snapshot.get(i);
-            Models::VideoArtwork *videoArtwork = dynamic_cast<Models::VideoArtwork *>(artwork);
+        for (auto &artwork: snapshot) {
+            auto videoArtwork = std::dynamic_pointer_cast<Artworks::VideoArtwork>(artwork);
             if (videoArtwork != nullptr) {
                 const bool quickThumbnail = true, dontRecache = false;
-                requests.emplace_back(new VideoCacheRequest(videoArtwork,
-                                                            dontRecache,
-                                                            quickThumbnail,
-                                                            goodQualityAllowed));
+                requests.emplace_back(std::make_shared<VideoCacheRequest>(videoArtwork,
+                                                                          dontRecache,
+                                                                          quickThumbnail,
+                                                                          goodQualityAllowed));
             }
         }
 
         m_CachingWorker->submitItems(requests);
         m_CachingWorker->submitSeparator();
+    }
+
+    void VideoCachingService::generateThumbnail(std::shared_ptr<Artworks::VideoArtwork> const &videoArtwork) {
+        Q_ASSERT(videoArtwork != nullptr);
+        if (videoArtwork == nullptr) { return; }
+        LOG_DEBUG << "#" << videoArtwork->getItemID();
+
+#ifndef INTEGRATION_TESTS
+        const bool goodQualityAllowed = m_SwitcherModel.getGoodQualityVideoPreviews();
+#else
+        const bool goodQualityAllowed = false;
+#endif
+        const bool quickThumbnail = true, dontRecache = false;
+
+        std::shared_ptr<VideoCacheRequest> request(new VideoCacheRequest(videoArtwork,
+                                                                         dontRecache,
+                                                                         quickThumbnail,
+                                                                         goodQualityAllowed));
+        m_CachingWorker->submitItem(request);
     }
 
     void VideoCachingService::waitWorkerIdle() {

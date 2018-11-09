@@ -2,15 +2,30 @@
 #define ARTWORKMETADATAMOCK
 
 #include <QString>
-#include "../../xpiks-qt/Models/imageartwork.h"
-#include "../../xpiks-qt/MetadataIO/originalmetadata.h"
+#include <QStringList>
+#include <QtGlobal>
+
+#include "Artworks/basickeywordsmodel.h"
+#include "Artworks/basicmetadatamodel.h"
+#include "Artworks/imageartwork.h"
+#include "Common/types.h"
+#include "MetadataIO/originalmetadata.h"
 
 namespace Mocks {
-    class ArtworkMetadataMock : public Models::ImageArtwork {
+    class ArtworkMetadataMock : public Artworks::ImageArtwork {
     public:
-        ArtworkMetadataMock(const QString &filepath, qint64 directoryID = 0):
-            Models::ImageArtwork(filepath, 0, directoryID)
+        ArtworkMetadataMock():
+            Artworks::ImageArtwork("random.jpg", 0, 0)
         {
+        }
+
+        ArtworkMetadataMock(const QString &filepath, qint64 directoryID = 0):
+            Artworks::ImageArtwork(filepath, 0, directoryID)
+        {
+        }
+
+        void initialize() {
+            this->initAsEmpty();
         }
 
         void initialize(const QString &title, const QString &description, const QStringList &keywords, bool overwrite=false) {
@@ -29,15 +44,17 @@ namespace Mocks {
             this->resetModified();
         }
 
-        QString retrieveKeyword(int index) { return getBasicModel()->retrieveKeyword(index); }
-        int rowCount() const { return getBasicModel()->rowCount(); }
+        QString retrieveKeyword(int index) { return getBasicModel().retrieveKeyword(index); }
+        int rowCount() const { return getBasicMetadataModel().rowCount(); }
 
-        bool isTitleEmpty() { return getBasicModel()->isTitleEmpty(); }
-        bool isDescriptionEmpty() { return getBasicModel()->isDescriptionEmpty(); }
+        bool isTitleEmpty() { return getBasicMetadataModel().isTitleEmpty(); }
+        bool isDescriptionEmpty() { return getBasicMetadataModel().isDescriptionEmpty(); }
 
-        bool areKeywordsEmpty() { return getBasicModel()->areKeywordsEmpty(); }
+        bool areKeywordsEmpty() { return getBasicModel().areKeywordsEmpty(); }
 
         void resetAll() { this->clearModel(); this->resetFlags(); }
+
+        virtual void justChanged() override { /*Don't need threads*/ }
 
         //virtual QString getDirectory() const { return "somedirectory"; }
     };

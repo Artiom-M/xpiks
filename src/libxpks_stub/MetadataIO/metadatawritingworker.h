@@ -12,16 +12,17 @@
 #define METADATAWRITINGWORKER_H
 
 #include <QObject>
-#include <QVector>
 #include <QProcess>
-#include <MetadataIO/artworkssnapshot.h>
+#include <QString>
+#include <QStringList>
+
+#include "Artworks/artworkssnapshot.h"
 
 namespace Helpers {
     class AsyncCoordinator;
 }
 
 namespace Models {
-    class ArtworkMetadata;
     class SettingsModel;
 }
 
@@ -31,9 +32,9 @@ namespace libxpks {
         {
             Q_OBJECT
         public:
-            explicit ExiftoolImageWritingWorker(const MetadataIO::ArtworksSnapshot &artworksToWrite,
-                                                Helpers::AsyncCoordinator *asyncCoordinator,
-                                                Models::SettingsModel *settingsModel,
+            explicit ExiftoolImageWritingWorker(Artworks::ArtworksSnapshot const &artworksToWrite,
+                                                Helpers::AsyncCoordinator &asyncCoordinator,
+                                                Models::SettingsModel &settingsModel,
                                                 bool useBackups);
             virtual ~ExiftoolImageWritingWorker();
 
@@ -56,9 +57,9 @@ namespace libxpks {
 
         private:
             QProcess *m_ExiftoolProcess;
-            MetadataIO::ArtworksSnapshot m_ItemsToWriteSnapshot;
-            Helpers::AsyncCoordinator *m_AsyncCoordinator;
-            Models::SettingsModel *m_SettingsModel;
+            Artworks::ArtworksSnapshot m_ItemsToWriteSnapshot;
+            Helpers::AsyncCoordinator &m_AsyncCoordinator;
+            Models::SettingsModel &m_SettingsModel;
             bool m_UseBackups;
             bool m_WriteSuccess;
         };

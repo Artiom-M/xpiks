@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,8 +11,13 @@
 #ifndef CACHINGIMAGEPROVIDER_H
 #define CACHINGIMAGEPROVIDER_H
 
+#include <QImage>
+#include <QObject>
+#include <QQmlEngine>
 #include <QQuickImageProvider>
-#include <QHash>
+#include <QString>
+
+class QSize;
 
 namespace QMLExtensions {
     class ImageCachingService;
@@ -23,7 +28,7 @@ namespace QMLExtensions {
     public:
         CachingImageProvider(ImageType type, Flags flags = 0) :
             QQuickImageProvider(type, flags),
-            m_ImageCachingService(NULL)
+            m_ImageCachingService(nullptr)
         {}
 
         virtual ~CachingImageProvider() {}

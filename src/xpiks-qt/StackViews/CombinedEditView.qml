@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -26,6 +26,7 @@ Rectangle {
     color: uiColors.selectedArtworkBackground
 
     property variant componentParent
+    property variant combinedArtworks: dispatcher.getCommandTarget(UICommand.SetupEditSelectedArtworks)
     property var autoCompleteBox
 
     property bool wasLeftSideCollapsed
@@ -39,8 +40,6 @@ Rectangle {
 
     function closePopup() {
         closeAutoComplete()
-        combinedArtworks.resetModel()
-        uiManager.clearCurrentItem()
         mainStackView.pop({immediate: true})
         restoreLeftPane()
     }
@@ -64,38 +63,42 @@ Rectangle {
     }
 
     function openDuplicatesView() {
-        combinedArtworks.setupDuplicatesModel()
-
-        var wasCollapsed = applicationWindow.leftSideCollapsed
-        mainStackView.push({
-                               item: "qrc:/StackViews/DuplicatesReView.qml",
-                               properties: {
-                                   componentParent: applicationWindow,
-                                   wasLeftSideCollapsed: wasCollapsed
-                               },
-                               destroyOnPop: true
-                           })
+        dispatcher.dispatch(UICommand.ReviewDuplicatesCombined, {})
     }
 
-    function openSuggestionView() {
+    function suggestKeywords() {
         var callbackObject = {
             promoteKeywords: function(keywords) {
                 combinedArtworks.pasteKeywords(keywords)
             }
         }
 
-        combinedArtworks.initSuggestion()
-
-        Common.launchDialog("Dialogs/KeywordsSuggestion.qml",
-                            componentParent,
-                            {callbackObject: callbackObject});
+        dispatcher.dispatch(UICommand.InitSuggestionCombined, callbackObject)
     }
 
     function fixSpelling() {
-        combinedArtworks.suggestCorrections()
-        Common.launchDialog("Dialogs/SpellCheckSuggestionsDialog.qml",
+        dispatcher.dispatch(UICommand.ReviewSpellingCombined, {})
+    }
+
+    function editInPlainText() {
+        var callbackObject = {
+            onSuccess: function(text, spaceIsSeparator) {
+                dispatcher.dispatch(UICommand.PlainTextEdit, {
+                                        text: text,
+                                        spaceIsSeparator: spaceIsSeparator})
+            },
+            onClose: function() {
+                flv.activateEdit()
+            }
+        }
+
+        Common.launchDialog("Dialogs/PlainTextKeywordsDialog.qml",
                             componentParent,
-                            {})
+                            {
+                                callbackObject: callbackObject,
+                                keywordsText: combinedArtworks.getKeywordsString(),
+                                keywordsModel: combinedArtworks.getBasicModelObject()
+                            });
     }
 
     MessageDialog {
@@ -134,7 +137,7 @@ Rectangle {
         MenuItem {
             visible: wordRightClickMenu.showAddToDict
             text: i18.n + qsTr("Add \"%1\" to dictionary").arg(wordRightClickMenu.word)
-            onTriggered: spellCheckService.addWordToUserDictionary(wordRightClickMenu.word);
+            onTriggered: dispatcher.dispatch(UICommand.AddToUserDictionary, wordRightClickMenu.word)
         }
 
         Menu {
@@ -212,7 +215,7 @@ Rectangle {
         MenuItem {
             text: i18.n + qsTr("Suggest keywords")
             onTriggered: {
-                openSuggestionView()
+                suggestKeywords()
             }
         }
 
@@ -244,7 +247,7 @@ Rectangle {
 
         MenuItem {
             text: i18.n + qsTr("Copy")
-            enabled: keywordsMoreMenu.keywordsCount > 0
+            enabled: combinedArtworks.keywordsCount > 0
             onTriggered: {
                 clipboard.setText(combinedArtworks.getKeywordsString())
             }
@@ -263,22 +266,7 @@ Rectangle {
         MenuItem {
             text: i18.n + qsTr("Edit in plain text")
             onTriggered: {
-                var callbackObject = {
-                    onSuccess: function(text, spaceIsSeparator) {
-                        combinedArtworks.plainTextEdit(text, spaceIsSeparator)
-                    },
-                    onClose: function() {
-                        flv.activateEdit()
-                    }
-                }
-
-                Common.launchDialog("Dialogs/PlainTextKeywordsDialog.qml",
-                                    applicationWindow,
-                                    {
-                                        callbackObject: callbackObject,
-                                        keywordsText: combinedArtworks.getKeywordsString(),
-                                        keywordsModel: combinedArtworks.getBasicModel()
-                                    });
+                editInPlainText()
             }
         }
 
@@ -291,17 +279,43 @@ Rectangle {
         }
     }
 
+    Menu {
+        id: contextMenu
+        property string thumbPath
+
+        MenuItem {
+            text: i18.n + qsTr("Preview")
+            onTriggered: {
+                Common.launchDialog("Dialogs/SimplePreview.qml",
+                                    componentParent,
+                                    {
+                                        thumbpath: contextMenu.thumbPath
+                                    })
+            }
+        }
+    }
+
+    Menu {
+        id: dotsMenu
+
+        MenuItem {
+            text: i18.n + qsTr("Assign from selected")
+            onTriggered: {
+                combinedArtworks.assignFromSelected()
+                combinedArtworks.unselectAllItems()
+            }
+        }
+    }
+
     Component.onCompleted: {
         focus = true
-
-        combinedArtworks.registerAsCurrentItem()
 
         titleTextInput.forceActiveFocus()
         titleTextInput.cursorPosition = titleTextInput.text.length
     }
 
     Connections {
-        target: helpersWrapper
+        target: xpiksApp
         onGlobalBeforeDestruction: {
             console.debug("UI:EditArtworkHorizontalDialog # globalBeforeDestruction")
             //closePopup()
@@ -316,7 +330,7 @@ Rectangle {
     }
 
     Connections {
-        target: combinedArtworks
+        target: acSource
 
         onCompletionsAvailable: {
             acSource.initializeCompletions()
@@ -339,7 +353,7 @@ Rectangle {
             var isBelow = (tmp.y + popupHeight) < directParent.height;
 
             var options = {
-                model: acSource.getCompletionsModel(),
+                model: acSource.getCompletionsModelObject(),
                 autoCompleteSource: acSource,
                 editableTags: flv,
                 isBelowEdit: isBelow,
@@ -375,7 +389,7 @@ Rectangle {
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        width: applicationWindow.leftSideCollapsed ? 0 : 2
+        width: appHost.leftSideCollapsed ? 0 : 2
         color: uiColors.defaultDarkerColor
     }
 
@@ -393,13 +407,16 @@ Rectangle {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            height: childrenRect.height
             spacing: 20
 
             StyledButton {
                 width: 100
                 text: i18.n + qsTr("Cancel")
-                onClicked: closePopup()
+                onClicked: {
+                    flv.onBeforeClose()
+                    dispatcher.dispatch(UICommand.EditSelectedArtworks, false)
+                    closePopup()
+                }
             }
 
             StyledButton {
@@ -408,7 +425,7 @@ Rectangle {
                 isDefault: true
                 onClicked: {
                     flv.onBeforeClose()
-                    combinedArtworks.saveEdits()
+                    dispatcher.dispatch(UICommand.EditSelectedArtworks, true)
                     closePopup()
                 }
             }
@@ -426,6 +443,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: topHeader.bottom
         anchors.bottom: bottomActionsPane.top
+        property bool isWideEnough: width > 650
         anchors.leftMargin: 10
         anchors.rightMargin: 15
         anchors.topMargin: 10
@@ -462,7 +480,7 @@ Rectangle {
             Item {
                 Layout.fillWidth: true
                 height: parent.height
-                enabled: titleCheckBox.checked
+                enabled: combinedArtworks.changeTitle
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -561,18 +579,20 @@ Rectangle {
                                 }
 
                                 Keys.onTabPressed: {
-                                    if (descriptionCheckBox.checked) {
+                                    if (combinedArtworks.changeDescription) {
                                         descriptionTextInput.forceActiveFocus()
                                         descriptionTextInput.cursorPosition = descriptionTextInput.text.length
                                         event.accepted = true
-                                    } else if (keywordsCheckBox.checked) {
+                                    } else if (combinedArtworks.changeKeywords) {
                                         flv.activateEdit()
                                         event.accepted = true
                                     }
                                 }
 
                                 Component.onCompleted: {
-                                    combinedArtworks.initTitleHighlighting(titleTextInput.textDocument)
+                                    uiManager.initTitleHighlighting(
+                                                combinedArtworks.getBasicModelObject(),
+                                                titleTextInput.textDocument)
                                 }
 
                                 onCursorRectangleChanged: titleFlick.ensureVisible(cursorRectangle)
@@ -629,7 +649,7 @@ Rectangle {
             Item {
                 Layout.fillWidth: true
                 height: parent.height
-                enabled: descriptionCheckBox.checked
+                enabled: combinedArtworks.changeDescription
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -738,13 +758,15 @@ Rectangle {
                                 textFormat: TextEdit.PlainText
 
                                 Component.onCompleted: {
-                                    combinedArtworks.initDescriptionHighlighting(descriptionTextInput.textDocument)
+                                    uiManager.initDescriptionHighlighting(
+                                                combinedArtworks.getBasicModelObject(),
+                                                descriptionTextInput.textDocument)
                                 }
 
                                 onCursorRectangleChanged: descriptionFlick.ensureVisible(cursorRectangle)
 
                                 Keys.onBacktabPressed: {
-                                    if (titleCheckBox.checked) {
+                                    if (combinedArtworks.changeTitle) {
                                         titleTextInput.forceActiveFocus()
                                         titleTextInput.cursorPosition = titleTextInput.text.length
                                         event.accepted = true
@@ -752,7 +774,7 @@ Rectangle {
                                 }
 
                                 Keys.onTabPressed: {
-                                    if (keywordsCheckBox.checked) {
+                                    if (combinedArtworks.changeKeywords) {
                                         flv.activateEdit()
                                         event.accepted = true
                                     }
@@ -810,7 +832,7 @@ Rectangle {
                 anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
-                enabled: keywordsCheckBox.checked
+                enabled: combinedArtworks.changeKeywords
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -857,7 +879,8 @@ Rectangle {
                         anchors.right: parent.right
                         Layout.fillHeight: true
                         color: enabled ? uiColors.inputBackgroundColor : uiColors.inputInactiveBackground
-                        property var keywordsModel: combinedArtworks.getBasicModel()
+                        property var keywordsModel: combinedArtworks.getBasicModelObject()
+                        state: ""
 
                         function removeKeyword(index) {
                             combinedArtworks.removeKeywordAt(index)
@@ -868,7 +891,11 @@ Rectangle {
                         }
 
                         function appendKeyword(keyword) {
-                            combinedArtworks.appendKeyword(keyword)
+                            var added = combinedArtworks.appendKeyword(keyword)
+                            if (!added) {
+                                keywordsWrapper.state = "blinked"
+                                blinkTimer.start()
+                            }
                         }
 
                         function pasteKeywords(keywordsList) {
@@ -881,26 +908,28 @@ Rectangle {
 
                         EditableTags {
                             id: flv
-                            objectName: "keywordsInput"
+                            objectName: "editableTags"
                             anchors.fill: parent
                             model: keywordsWrapper.keywordsModel
                             property int keywordHeight: uiManager.keywordHeight
                             populateAnimationEnabled: false
                             scrollStep: keywordHeight
+                            property int droppedIndex: -1
+                            onDroppedIndexChanged: dropTimer.start()
 
                             function acceptCompletion(completionID) {
-                                var accepted = combinedArtworks.acceptCompletionAsPreset(completionID);
-                                if (!accepted) {
+                                if (acSource.isPreset(completionID)) {
+                                    dispatcher.dispatch(UICommand.AcceptPresetCompletionForCombined, completionID)
+                                    flv.editControl.acceptCompletion('')
+                                } else {
                                     var completion = acSource.getCompletion(completionID)
                                     flv.editControl.acceptCompletion(completion)
-                                } else {
-                                    flv.editControl.acceptCompletion('')
                                 }
                             }
 
-                            delegate: KeywordWrapper {
+                            delegate: DraggableKeywordWrapper {
                                 id: kw
-                                isHighlighted: keywordsCheckBox.checked
+                                isHighlighted: combinedArtworks.changeKeywords
                                 keywordText: keyword
                                 hasSpellCheckError: !iscorrect
                                 hasDuplicate: hasduplicate
@@ -908,6 +937,9 @@ Rectangle {
                                 itemHeight: flv.keywordHeight
                                 closeIconDisabledColor: uiColors.closeIconInactiveColor
                                 onRemoveClicked: keywordsWrapper.removeKeyword(delegateIndex)
+                                dragDropAllowed: switcher.keywordsDragDropEnabled
+                                dragParent: flv
+                                wasDropped: flv.droppedIndex == delegateIndex
                                 onActionDoubleClicked: {
                                     var callbackObject = {
                                         onSuccess: function(replacement) {
@@ -937,6 +969,18 @@ Rectangle {
                                     wordRightClickMenu.keywordIndex = kw.delegateIndex
                                     wordRightClickMenu.popupIfNeeded()
                                 }
+
+                                onMoveRequested: {
+                                    if (from !== to) {
+                                        flv.droppedIndex = to
+                                    }
+
+                                    if (combinedArtworks.moveKeyword(from, to)) {
+                                        console.debug("Just dropped to " + to)
+                                    } else {
+                                        flv.droppedIndex = -1
+                                    }
+                                }
                             }
 
                             onTagAdded: {
@@ -952,17 +996,17 @@ Rectangle {
                             }
 
                             onBackTabPressed: {
-                                if (descriptionCheckBox.checked) {
+                                if (combinedArtworks.changeDescription) {
                                     descriptionTextInput.forceActiveFocus()
                                     descriptionTextInput.cursorPosition = descriptionTextInput.text.length
-                                } else if (titleCheckBox.checked) {
+                                } else if (combinedArtworks.changeTitle) {
                                     titleTextInput.forceActiveFocus()
                                     titleTextInput.cursorPosition = titleTextInput.text.length
                                 }
                             }
 
                             onCompletionRequested: {
-                                combinedArtworks.generateCompletions(prefix)
+                                dispatcher.dispatch(UICommand.GenerateCompletions, prefix)
                             }
 
                             onExpandLastAsPreset: {
@@ -981,6 +1025,30 @@ Rectangle {
                             anchors.rightMargin: -15
                             flickable: flv
                         }
+
+                        Timer {
+                            id: blinkTimer
+                            repeat: false
+                            interval: 400
+                            triggeredOnStart: false
+                            onTriggered: keywordsWrapper.state = ""
+                        }
+
+                        Timer {
+                            id: dropTimer
+                            repeat: false
+                            interval: 1000
+                            triggeredOnStart: false
+                            onTriggered: flv.droppedIndex = -1
+                        }
+
+                        states: State {
+                            name: "blinked";
+                            PropertyChanges {
+                                target: keywordsWrapper;
+                                border.width: 0
+                            }
+                        }
                     }
 
                     Item { height: 3 }
@@ -990,7 +1058,7 @@ Rectangle {
                         anchors.leftMargin: 3
                         anchors.right: parent.right
                         anchors.rightMargin: 3
-                        height: childrenRect.height
+                        height: 15
                         spacing: 5
 
                         StyledCheckbox {
@@ -1006,6 +1074,7 @@ Rectangle {
 
                         StyledLink {
                             id: fixSpellingLink
+                            objectName: "fixSpellingLink"
                             text: i18.n + qsTr("Fix spelling")
                             property bool canBeShown: {
                                 return keywordsWrapper.keywordsModel ?
@@ -1047,11 +1116,11 @@ Rectangle {
                         StyledLink {
                             id: suggestLink
                             text: i18.n + qsTr("Suggest keywords")
-                            property bool canBeShown: combinedArtworks.keywordsCount < warningsModel.minKeywordsCount
+                            property bool canBeShown: (combinedArtworks.keywordsCount < warningsModel.minKeywordsCount) || (mainRect.isWideEnough)
                             visible: canBeShown
                             enabled: canBeShown
                             onClicked: {
-                                openSuggestionView()
+                                suggestKeywords()
                             }
                         }
 
@@ -1078,13 +1147,33 @@ Rectangle {
                             verticalAlignment: Text.AlignVCenter
                         }
 
+                        StyledLink {
+                            id: clearLink
+                            property bool canBeShown: combinedArtworks.keywordsCount > 0
+                            text: i18.n + qsTr("Clear")
+                            enabled: canBeShown
+                            visible: canBeShown
+                            onClicked: clearKeywordsDialog.open()
+                        }
+
+                        StyledText {
+                            enabled: clearLink.canBeShown
+                            visible: clearLink.canBeShown
+                            text: "|"
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
                         Item {
                             width: childrenRect.width
                             height: moreLink.height
 
                             StyledText {
                                 id: moreLink
-                                color: enabled ? (moreMA.pressed ? uiColors.linkClickedColor : uiColors.artworkActiveColor) : (isActive ? uiColors.labelActiveForeground : uiColors.labelInactiveForeground)
+                                color: enabled ? (moreMA.pressed ?
+                                                      uiColors.linkClickedColor :
+                                                      uiColors.artworkActiveColor) :
+                                                 (isActive ? uiColors.labelActiveForeground :
+                                                             uiColors.labelInactiveForeground)
                                 text: i18.n + qsTr("More")
                                 anchors.verticalCenter: parent.verticalCenter
                                 // \u25BE - triangle
@@ -1130,41 +1219,29 @@ Rectangle {
         anchors.left: leftSpacer.right
         anchors.right: parent.right
         anchors.bottom: bottomPane.top
-        height: 45
+        height: 55
         color: uiColors.defaultDarkColor
 
         RowLayout {
-            spacing: 20
+            spacing: 10
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.leftMargin: 20
             anchors.rightMargin: 20
-            height: childrenRect.height
             anchors.verticalCenter: parent.verticalCenter
 
             StyledButton {
+                objectName: "copyToQuickBufferButton"
                 text: i18.n + qsTr("Copy to Quick Buffer")
                 width: 160
                 enabled: (combinedArtworks.title.length > 0) || (combinedArtworks.description.length > 0) || (combinedArtworks.keywordsCount > 0)
                 onClicked: {
-                    combinedArtworks.copyToQuickBuffer()
-                    uiManager.activateQuickBufferTab()
+                    dispatcher.dispatch(UICommand.CopyCombinedToQuickBuffer, {})
                 }
             }
 
             Item {
                 Layout.fillWidth: true
-            }
-
-            StyledButton {
-                text: i18.n + qsTr("Assign from selected")
-                width: 160
-                enabled: combinedArtworks.selectedArtworksCount > 0
-                tooltip: i18.n + qsTr("Combine metadata from selected artworks")
-                onClicked: {
-                    combinedArtworks.assignFromSelected()
-                    combinedArtworks.unselectAllItems()
-                }
             }
 
             StyledButton {
@@ -1176,6 +1253,12 @@ Rectangle {
                     confirmRemoveArtworksDialog.itemsCount = combinedArtworks.selectedArtworksCount
                     confirmRemoveArtworksDialog.open()
                 }
+            }
+
+            DotsButton {
+                defaultDotsColor: enabled ? uiColors.labelInactiveForeground : uiColors.inactiveControlColor
+                enabled: combinedArtworks.selectedArtworksCount > 0
+                onDotsClicked: dotsMenu.popup()
             }
         }
     }
@@ -1256,14 +1339,6 @@ Rectangle {
                 }
             }
 
-            add: Transition {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 230 }
-            }
-
-            remove: Transition {
-                NumberAnimation { property: "opacity"; to: 0; duration: 230 }
-            }
-
             displaced: Transition {
                 NumberAnimation { properties: "x,y"; duration: 230 }
             }
@@ -1283,6 +1358,7 @@ Rectangle {
                 anchors.bottom: parent.bottom
                 width: bottomPane.height
                 color: isselected ? uiColors.panelSelectedColor : "transparent"
+                property string thumbPath: thumbpath
 
                 Rectangle {
                     anchors.fill: parent
@@ -1310,28 +1386,25 @@ Rectangle {
                     cache: false
                 }
 
-                Image {
-                    id: videoTypeIconSmall
-                    visible: isvideo
-                    enabled: isvideo
-                    source: "qrc:/Graphics/video-icon-s.png"
-                    fillMode: Image.PreserveAspectFit
-                    sourceSize.width: 150
-                    sourceSize.height: 150
-                    anchors.fill: artworkImage
-                    cache: true
-                }
-
-                Image {
-                    id: imageTypeIcon
-                    visible: hasvectorattached
-                    enabled: hasvectorattached
-                    source: "qrc:/Graphics/vector-icon.svg"
-                    sourceSize.width: 20
-                    sourceSize.height: 20
-                    anchors.left: artworkImage.left
+                Rectangle {
+                    anchors.right: artworkImage.right
                     anchors.bottom: artworkImage.bottom
-                    cache: true
+                    width: 20
+                    height: 20
+                    color: uiColors.defaultDarkColor
+                    property bool isVideo: isvideo
+                    property bool isVector: hasvectorattached
+                    visible: isVideo || isVector
+                    enabled: isVideo || isVector
+
+                    Image {
+                        id: typeIcon
+                        anchors.fill: parent
+                        source: parent.isVector ? "qrc:/Graphics/vector-icon.svg" : (parent.isVideo ? "qrc:/Graphics/video-icon.svg" : "")
+                        sourceSize.width: 20
+                        sourceSize.height: 20
+                        cache: true
+                    }
                 }
 
                 Rectangle {
@@ -1353,8 +1426,14 @@ Rectangle {
                     id: imageMA
                     anchors.fill: parent
                     hoverEnabled: true
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
                     onClicked: {
-                        combinedArtworks.setArtworkSelected(delegateIndex, !isselected)
+                        if (mouse.button == Qt.RightButton) {
+                            contextMenu.thumbPath = cellItem.thumbPath
+                            contextMenu.popup()
+                        } else {
+                             combinedArtworks.setArtworkSelected(delegateIndex, !isselected)
+                        }
                     }
                 }
             }

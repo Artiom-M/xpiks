@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,43 +9,34 @@
  */
 
 #include "helpersqmlwrapper.h"
-#include <QStringList>
+
+#include <QChar>
+#include <QFileInfo>
 #include <QProcess>
-#include <QDir>
-#include <QQuickWindow>
-#include <QSysInfo>
-#include <QCoreApplication>
-#include <QQmlEngine>
-#include "keywordshelpers.h"
-#include "../Commands/commandmanager.h"
-#include "../Models/logsmodel.h"
-#include "../Models/artworkuploader.h"
-#include "../AutoComplete/stringsautocompletemodel.h"
-#include "../Models/ziparchiver.h"
-#include "../SpellCheck/spellcheckerservice.h"
-#include "../Models/deletekeywordsviewmodel.h"
-#include "../Models/uploadinforepository.h"
-#include "../SpellCheck/spellchecksuggestionmodel.h"
-#include "logger.h"
-#include "../Common/defines.h"
-#include "../Helpers/filehelpers.h"
-#include "../Helpers/updatehelpers.h"
-#include "../QMLExtensions/colorsmodel.h"
+#include <QStringList>
+#include <Qt>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Common/logging.h"
+#include "Helpers/filehelpers.h"
+#include "Helpers/keywordshelpers.h"
+#include "Helpers/logger.h"
+#include "QMLExtensions/colorsmodel.h"
 
 #ifdef Q_OS_WIN
+#include <QDir>
+#include <QQuickWindow>
 #include <QWinTaskbarButton>
 #include <QWinTaskbarProgress>
 #endif
 
 namespace Helpers {
-    HelpersQmlWrapper::HelpersQmlWrapper(QMLExtensions::ColorsModel *colorsModel):
-        m_IsUpdateDownloaded(false),
-        m_HaveUpgradeConsent(false),
+    HelpersQmlWrapper::HelpersQmlWrapper(Common::ISystemEnvironment &environment, QMLExtensions::ColorsModel &colorsModel):
+        m_Environment(environment),
         m_ColorsModel(colorsModel)
     {
-        Q_ASSERT(colorsModel != nullptr);
-
-#ifdef Q_OS_WIN
+#if defined(Q_OS_WIN) && !defined(INTEGRATION_TESTS) && !defined(UI_TESTS)
         m_WinTaskbarButtonApplicable = QSysInfo::windowsVersion() >= QSysInfo::WV_WINDOWS7;
         if (m_WinTaskbarButtonApplicable) {
             m_TaskbarButton = new QWinTaskbarButton(this);
@@ -63,23 +54,6 @@ namespace Helpers {
         return doSanitizeKeyword(keyword);
     }
 
-    void HelpersQmlWrapper::afterConstruction() {
-        m_CommandManager->afterConstructionCallback();
-    }
-
-    void HelpersQmlWrapper::beforeDestruction() {
-        LOG_DEBUG << "emitting signal";
-        emit globalBeforeDestruction();
-        QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-        m_CommandManager->beforeDestructionCallback();
-        QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-
-        if (m_IsUpdateDownloaded && m_HaveUpgradeConsent) {
-            LOG_INFO << "Installing update" << m_PathToUpdate;
-            Helpers::installUpdate(m_PathToUpdate);
-        }
-    }
-
     void HelpersQmlWrapper::revealLogFile() {
         LOG_DEBUG << "#";
         QString logFilePath = Logger::getInstance().getLogFilePath();
@@ -91,6 +65,7 @@ namespace Helpers {
     }
 
     void Helpers::HelpersQmlWrapper::reportOpen() {
+        //xpiks()->reportUserAction(Connectivity::UserAction::Open);
     }
 
     void HelpersQmlWrapper::setProgressIndicator(QQuickWindow *window) {
@@ -103,7 +78,7 @@ namespace Helpers {
     }
 
     void HelpersQmlWrapper::turnTaskbarProgressOn() {
-#ifdef Q_OS_WIN
+#if defined(Q_OS_WIN) && !defined(UI_TESTS)
         if (!m_WinTaskbarButtonApplicable) { return; }
         LOG_DEBUG << "Turning on taskbar button in Windows";
         QWinTaskbarProgress *progress = m_TaskbarButton->progress();
@@ -114,7 +89,7 @@ namespace Helpers {
     }
 
     void HelpersQmlWrapper::setTaskbarProgress(double value) {
-#ifdef Q_OS_WIN
+#if defined(Q_OS_WIN) && !defined(UI_TESTS)
         if (!m_WinTaskbarButtonApplicable) { return; }
         LOG_DEBUG << value;
         QWinTaskbarProgress *progress = m_TaskbarButton->progress();
@@ -125,7 +100,7 @@ namespace Helpers {
     }
 
     void HelpersQmlWrapper::turnTaskbarProgressOff() {
-#ifdef Q_OS_WIN
+#if defined(Q_OS_WIN) && !defined(UI_TESTS)
         if (!m_WinTaskbarButtonApplicable) { return; }
         LOG_DEBUG << "Turning off taskbar button in Windows";
         QWinTaskbarProgress *progress = m_TaskbarButton->progress();
@@ -133,91 +108,32 @@ namespace Helpers {
 #endif
     }
 
-    bool HelpersQmlWrapper::getPluginsAvailable() const {
-        bool result = false;
-#ifdef WITH_PLUGINS
-        result = true;
-#endif
-        return result;
-    }
-
-    void HelpersQmlWrapper::removeUnavailableFiles() {
-        m_CommandManager->removeUnavailableFiles();
-    }
-
     bool HelpersQmlWrapper::isVector(const QString &path) const {
         return path.endsWith("eps", Qt::CaseInsensitive) ||
                 path.endsWith("ai", Qt::CaseInsensitive);
+    }
+
+    bool HelpersQmlWrapper::isVideo(const QString &path) const {
+        return Helpers::couldBeVideo(path);
     }
 
     QString HelpersQmlWrapper::toImagePath(const QString &path) const {
         return Helpers::getImagePath(path);
     }
 
-    void HelpersQmlWrapper::setUpgradeConsent() {
-        m_HaveUpgradeConsent = true;
-    }
-
-    void HelpersQmlWrapper::upgradeNow() {
-        setUpgradeConsent();
-        emit upgradeInitiated();
-    }
-
     QString HelpersQmlWrapper::getAssetForTheme(const QString &assetName, int themeIndex) const {
-        QString themeName = m_ColorsModel->getThemeName(themeIndex);
-        themeName.remove(QChar(' '));
+        QString themeName = m_ColorsModel.getThemeName(themeIndex);
+        themeName.remove(QChar::Space);
         QString result = QString("qrc:/Graphics/%1/%2").arg(themeName.toLower()).arg(assetName);
         return result;
     }
 
-    QObject *HelpersQmlWrapper::getLogsModel() {
+    /*QObject *HelpersQmlWrapper::getLogsModel() {
         Models::LogsModel *model = m_CommandManager->getLogsModel();
         QQmlEngine::setObjectOwnership(model, QQmlEngine::CppOwnership);
         return model;
-    }
+    }*/
 
-    QObject *HelpersQmlWrapper::getFtpACList() {
-        auto *artworkUploader = m_CommandManager->getArtworkUploader();
-        AutoComplete::StringsAutoCompleteModel *model = artworkUploader->getStocksCompletionSource();
-        QQmlEngine::setObjectOwnership(model, QQmlEngine::CppOwnership);
-        return model;
-    }
-
-    QObject *HelpersQmlWrapper::getArtworkUploader() {
-        auto *model = m_CommandManager->getArtworkUploader();
-        QQmlEngine::setObjectOwnership(model, QQmlEngine::CppOwnership);
-        return model;
-    }
-
-    QObject *HelpersQmlWrapper::getZipArchiver() {
-        auto *model = m_CommandManager->getZipArchiver();
-        QQmlEngine::setObjectOwnership(model, QQmlEngine::CppOwnership);
-        return model;
-    }
-
-    QObject *HelpersQmlWrapper::getSpellCheckerService() {
-        auto *service = m_CommandManager->getSpellCheckerService();
-        QQmlEngine::setObjectOwnership(service, QQmlEngine::CppOwnership);
-        return service;
-    }
-
-    QObject *HelpersQmlWrapper::getDeleteKeywordsModel() {
-        auto *model = m_CommandManager->getDeleteKeywordsModel();
-        QQmlEngine::setObjectOwnership(model, QQmlEngine::CppOwnership);
-        return model;
-    }
-
-    QObject *HelpersQmlWrapper::getUploadInfos() {
-        auto *model = m_CommandManager->getUploadInfoRepository();
-        QQmlEngine::setObjectOwnership(model, QQmlEngine::CppOwnership);
-        return model;
-    }
-
-    QObject *HelpersQmlWrapper::getSpellCheckSuggestionsModel() {
-        auto *model = m_CommandManager->getSpellSuggestionsModel();
-        QQmlEngine::setObjectOwnership(model, QQmlEngine::CppOwnership);
-        return model;
-    }
     void HelpersQmlWrapper::revealFile(const QString &path) {
 #ifdef Q_OS_MAC
         QStringList args;
@@ -237,12 +153,11 @@ namespace Helpers {
         args << "/select," << QDir::toNativeSeparators(path);
         QProcess::startDetached("explorer", args);
 #endif
-    }
 
-    void HelpersQmlWrapper::updateIsDownloaded(QString pathToUpdate) {
-        m_IsUpdateDownloaded = true;
-        m_PathToUpdate = pathToUpdate;
-        emit updateDownloadedChanged(true);
-        emit updateDownloaded();
+#ifdef Q_OS_LINUX
+        QStringList args;
+        args << QFileInfo(path).absolutePath();
+        QProcess::startDetached("xdg-open", args);
+#endif
     }
 }

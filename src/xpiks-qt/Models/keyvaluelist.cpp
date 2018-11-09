@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,12 +9,20 @@
  */
 
 #include "keyvaluelist.h"
+
+#include <cstdint>
+
+#include <QByteArray>
 #include <QImageReader>
-#include <utility>
-#include "artworkmetadata.h"
-#include "imageartwork.h"
-#include "videoartwork.h"
-#include "../Helpers/filehelpers.h"
+#include <QLatin1Char>
+#include <QModelIndex>
+#include <QSize>
+#include <QStaticStringData>
+#include <QtGlobal>
+
+#include "Artworks/imageartwork.h"
+#include "Artworks/videoartwork.h"
+#include "Helpers/filehelpers.h"
 
 namespace Models {
     QString secondsToString(double seconds) {
@@ -69,10 +77,10 @@ namespace Models {
         return roleNames;
     }
 
-    void ArtworkPropertiesMap::updateProperties(ArtworkMetadata *metadata) {
-        Q_ASSERT(metadata != nullptr);
-        Models::ImageArtwork *imageArtwork = dynamic_cast<Models::ImageArtwork*>(metadata);
-        Models::VideoArtwork *videoArtwork = dynamic_cast<Models::VideoArtwork*>(metadata);
+    void ArtworkPropertiesMap::updateProperties(const std::shared_ptr<Artworks::ArtworkMetadata> &artwork) {
+        Q_ASSERT(artwork != nullptr);
+        auto imageArtwork = std::dynamic_pointer_cast<Artworks::ImageArtwork>(artwork);
+        auto videoArtwork = std::dynamic_pointer_cast<Artworks::VideoArtwork>(artwork);
 
         beginResetModel();
         {
@@ -89,9 +97,10 @@ namespace Models {
         endResetModel();
     }
 
-    void ArtworkPropertiesMap::setForTheImage(ImageArtwork *imageArtwork) {
+    void ArtworkPropertiesMap::setForTheImage(std::shared_ptr<Artworks::ImageArtwork> const &imageArtwork) {
         m_ValuesHash[int(ImageProperties::FilePathProperty)] = imageArtwork->getFilepath();
         m_ValuesHash[int(ImageProperties::FileSizeProperty)] = Helpers::describeFileSize(imageArtwork->getFileSize());
+        m_ValuesHash[int(ImageProperties::FileAccessProperty)] = imageArtwork->isReadOnly() ? QObject::tr("Read-only") : QObject::tr("Normal");
 
         QSize size;
         if (imageArtwork->isInitialized()) {
@@ -106,9 +115,10 @@ namespace Models {
         m_ValuesHash[int(ImageProperties::AttachedVectorProperty)] = imageArtwork->getAttachedVectorPath();
     }
 
-    void ArtworkPropertiesMap::setForTheVideo(VideoArtwork *videoArtwork) {
+    void ArtworkPropertiesMap::setForTheVideo(std::shared_ptr<Artworks::VideoArtwork> const &videoArtwork) {
         m_ValuesHash[int(VideoProperties::FilePathProperty)] = videoArtwork->getFilepath();
         m_ValuesHash[int(VideoProperties::FileSizeProperty)] = Helpers::describeFileSize(videoArtwork->getFileSize());
+        m_ValuesHash[int(ImageProperties::FileAccessProperty)] = videoArtwork->isReadOnly() ? QObject::tr("Read-only") : QObject::tr("Normal");
 
         QSize size;
         if (videoArtwork->isInitialized()) {
@@ -129,6 +139,7 @@ namespace Models {
         static const char *imagesPropertyNames[] = {
             /*FilePathProperty*/ QT_TRANSLATE_NOOP("ImageProperties", "File path"),
             /*FileSizeProperty*/ QT_TRANSLATE_NOOP("ImageProperties", "File size"),
+            /*FileAccessProperty*/  QT_TRANSLATE_NOOP("ImageProperties", "File access"),
             /*ImageSizeProperty*/QT_TRANSLATE_NOOP("ImageProperties", "Image size"),
             /*DateTakenProperty*/QT_TRANSLATE_NOOP("ImageProperties", "Date taken"),
             /*AttachedVectorProperty*/QT_TRANSLATE_NOOP("ImageProperties", "Vector")
@@ -137,6 +148,7 @@ namespace Models {
         static const char *videoPropertyNames[] = {
             /*FilePathProperty*/ QT_TRANSLATE_NOOP("VideoProperties", "File path"),
             /*FileSizeProperty*/ QT_TRANSLATE_NOOP("VideoProperties", "File size"),
+            /*FileAccessProperty*/  QT_TRANSLATE_NOOP("VideoProperties", "File access"),
             /*CodecProperty*/ QT_TRANSLATE_NOOP("VideoProperties", "Codec"),
             /*FrameSizeProperty*/QT_TRANSLATE_NOOP("VideoProperties", "Frame size"),
             /*VideoDurationProperty*/QT_TRANSLATE_NOOP("VideoProperties", "Duration"),

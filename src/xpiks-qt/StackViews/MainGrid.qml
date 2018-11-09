@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -25,62 +25,19 @@ import "../Constants/UIConfig.js" as UIConfig
 
 Item {
     id: mainGridComponent
-    property int myLeftMargin: applicationWindow.leftSideCollapsed ? 0 : 2
+    property int myLeftMargin: appHost.leftSideCollapsed ? 0 : 2
+    property variant componentParent
 
-    Action {
-        id: searchAction
-        shortcut: StandardKey.Find
-        onTriggered: filterText.forceActiveFocus()
-        enabled: (artworkRepository.artworksSourcesCount > 0) && (applicationWindow.openedDialogsCount == 0)
+    function fixDuplicatesAction(proxyIndex) {
+        dispatcher.dispatch(UICommand.ReviewDuplicatesArtwork, proxyIndex)
     }
 
-    Action {
-        id: selectAllAction
-        shortcut: StandardKey.SelectAll
-        enabled: (artworkRepository.artworksSourcesCount > 0) && (applicationWindow.openedDialogsCount == 0)
-        onTriggered: {
-            if (selectAllCheckbox.checked) {
-                filteredArtItemsModel.selectFilteredArtworks();
-            } else {
-                filteredArtItemsModel.unselectFilteredArtworks();
-            }
-        }
+    function suggestKeywords(proxyIndex) {
+        dispatcher.dispatch(UICommand.InitSuggestionArtwork, proxyIndex)
     }
 
-    function fixDuplicatesAction(artworkIndex) {
-        artItemsModel.setupDuplicatesModel(artworkIndex)
-
-        var wasCollapsed = applicationWindow.leftSideCollapsed
-        applicationWindow.collapseLeftPane()
-        mainStackView.push({
-                               item: "qrc:/StackViews/DuplicatesReView.qml",
-                               properties: {
-                                   componentParent: applicationWindow,
-                                   wasLeftSideCollapsed: wasCollapsed
-                               },
-                               destroyOnPop: true
-                           })
-    }
-
-    function suggestKeywords(artworkIndex) {
-        var callbackObject = {
-            promoteKeywords: function(keywords) {
-                artItemsModel.addSuggestedKeywords(artworkIndex, keywords)
-            }
-        }
-
-        artItemsModel.initSuggestion(artworkIndex)
-
-        Common.launchDialog("../Dialogs/KeywordsSuggestion.qml",
-                            applicationWindow,
-                            {callbackObject: callbackObject});
-    }
-
-    function fixSpelling(artworkIndex) {
-        artItemsModel.suggestCorrections(artworkIndex)
-        Common.launchDialog("../Dialogs/SpellCheckSuggestionsDialog.qml",
-                            applicationWindow,
-                            {})
+    function fixSpelling(proxyIndex) {
+        dispatcher.dispatch(UICommand.ReviewSpellingArtwork, proxyIndex)
     }
 
     function closeAutoComplete() {
@@ -90,17 +47,103 @@ Item {
     }
 
     function clearFilter() {
-        filteredArtItemsModel.searchTerm = ''
+        filteredArtworksListModel.searchTerm = ''
         if (filterText.length > 0) {
             filterText.text = ''
         }
         filterClearTimer.start()
     }
 
+    function editInPlainText(proxyIndex) {
+        var callbackObject = {
+            onSuccess: function(text, spaceIsSeparator) {
+                dispatcher.dispatch(UICommand.PlainTextEdit, {
+                                        text: text,
+                                        spaceIsSeparator: spaceIsSeparator})
+            },
+            onClose: function() {
+                filteredArtworksListModel.focusCurrentItemKeywords(proxyIndex)
+                //flv.activateEdit()
+            }
+        }
+
+        var basicModel = filteredArtworksListModel.getBasicModelObject(proxyIndex)
+        var keywordsString = filteredArtworksListModel.getKeywordsString(proxyIndex)
+
+        Common.launchDialog("Dialogs/PlainTextKeywordsDialog.qml",
+                            componentParent,
+                            {
+                                callbackObject: callbackObject,
+                                keywordsText: keywordsString,
+                                keywordsModel: basicModel
+                            });
+    }
+
+    Action {
+        id: searchAction
+        shortcut: StandardKey.Find
+        onTriggered: filterText.forceActiveFocus()
+        enabled: (artworksRepository.artworksSourcesCount > 0) && (applicationWindow.openedDialogsCount == 0)
+    }
+
+    Action {
+        id: selectAllAction
+        shortcut: StandardKey.SelectAll
+        enabled: (artworksRepository.artworksSourcesCount > 0) && (applicationWindow.openedDialogsCount == 0)
+        onTriggered: {
+            if (selectAllCheckbox.checked) {
+                filteredArtworksListModel.selectFilteredArtworks();
+            } else {
+                filteredArtworksListModel.unselectFilteredArtworks();
+            }
+        }
+    }
+
+    Menu {
+        id: artworkContextMenu
+        property string filename
+        property int index
+        property bool hasVectorAttached
+
+        MenuItem {
+            text: i18.n + qsTr("Edit")
+            onTriggered: dispatcher.dispatch(UICommand.SetupProxyArtworkEdit, artworkContextMenu.index)
+        }
+
+        MenuItem {
+            text: i18.n + qsTr("Show info")
+            onTriggered: dispatcher.dispatch(UICommand.ReviewArtworkInfo, artworkContextMenu.index)
+        }
+
+        MenuItem {
+            text: i18.n + qsTr("Detach vector")
+            enabled: artworkContextMenu.hasVectorAttached
+            visible: artworkContextMenu.hasVectorAttached
+            onTriggered: filteredArtworksListModel.detachVectorFromArtwork(artworkContextMenu.index)
+        }
+
+        MenuItem {
+            text: i18.n + qsTr("Copy to Quick Buffer")
+            onTriggered: {
+                dispatcher.dispatch(UICommand.CopyArtworkToQuickBuffer, artworkContextMenu.index)
+            }
+        }
+
+        MenuItem {
+            text: i18.n + qsTr("Fill from Quick Buffer")
+            onTriggered: dispatcher.dispatch(UICommand.FillArtworkFromQuickBuffer, artworkContextMenu.index)
+        }
+
+        MenuItem {
+            text: i18.n + qsTr("Show in folder")
+            onTriggered: helpersWrapper.revealArtworkFile(artworkContextMenu.filename);
+        }
+    }
+
     Menu {
         id: wordRightClickMenu
         property string word
-        property int artworkIndex
+        property int proxyIndex
         property int keywordIndex
         property bool showAddToDict: true
         property bool showExpandPreset: false
@@ -114,7 +157,7 @@ Item {
         MenuItem {
             visible: wordRightClickMenu.showAddToDict
             text: i18.n + qsTr("Add \"%1\" to dictionary").arg(wordRightClickMenu.word)
-            onTriggered: spellCheckService.addWordToUserDictionary(wordRightClickMenu.word);
+            onTriggered: dispatcher.dispatch(UICommand.AddToUserDictionary, wordRightClickMenu.word)
         }
 
         Menu {
@@ -131,7 +174,7 @@ Item {
                     text: name
                     onTriggered: {
                         var presetID = filteredPresetsModel.getOriginalID(index)
-                        artItemsModel.expandPreset(wordRightClickMenu.artworkIndex, wordRightClickMenu.keywordIndex, presetID);
+                        filteredArtworksListModel.expandPreset(wordRightClickMenu.proxyIndex, wordRightClickMenu.keywordIndex, presetID);
                     }
                 }
             }
@@ -140,7 +183,7 @@ Item {
 
     Menu {
         id: presetsMenu
-        property int artworkIndex
+        property int proxyIndex
 
         Menu {
             id: subMenu
@@ -165,7 +208,7 @@ Item {
                         delegate: MenuItem {
                             text: name
                             onTriggered: {
-                                artItemsModel.addPreset(presetsMenu.artworkIndex, groupMenu.groupModel.getOriginalID(index));
+                                filteredArtworksListModel.addPreset(presetsMenu.proxyIndex, groupMenu.groupModel.getOriginalID(index));
                             }
                         }
                     }
@@ -180,7 +223,7 @@ Item {
                 delegate: MenuItem {
                     text: name
                     onTriggered: {
-                        artItemsModel.addPreset(presetsMenu.artworkIndex, subMenu.defaultGroupModel.getOriginalID(index));
+                        filteredArtworksListModel.addPreset(presetsMenu.proxyIndex, subMenu.defaultGroupModel.getOriginalID(index));
                     }
                 }
             }
@@ -189,8 +232,7 @@ Item {
 
     Menu {
         id: keywordsMoreMenu
-        property int artworkIndex
-        property int filteredIndex
+        property int proxyIndex
         property int keywordsCount: 0
         property var editableTags
         property bool hasDuplicates: false
@@ -199,7 +241,7 @@ Item {
         MenuItem {
             text: i18.n + qsTr("Suggest keywords")
             onTriggered: {
-               suggestKeywords(keywordsMoreMenu.artworkIndex)
+               suggestKeywords(keywordsMoreMenu.proxyIndex)
             }
         }
 
@@ -209,7 +251,7 @@ Item {
             text: i18.n + qsTr("Fix spelling")
             enabled: keywordsMoreMenu.hasSpellingErrors
             onTriggered: {
-                fixSpelling(keywordsMoreMenu.artworkIndex)
+                fixSpelling(keywordsMoreMenu.proxyIndex)
             }
         }
 
@@ -217,7 +259,7 @@ Item {
             text: i18.n + qsTr("Show duplicates")
             enabled: keywordsMoreMenu.hasDuplicates
             onTriggered: {
-                fixDuplicatesAction(keywordsMoreMenu.artworkIndex)
+                fixDuplicatesAction(keywordsMoreMenu.proxyIndex)
             }
         }
 
@@ -227,7 +269,7 @@ Item {
             text: i18.n + qsTr("Copy")
             enabled: keywordsMoreMenu.keywordsCount > 0
             onTriggered: {
-                var keywordsString = filteredArtItemsModel.getKeywordsString(keywordsMoreMenu.filteredIndex)
+                var keywordsString = filteredArtworksListModel.getKeywordsString(keywordsMoreMenu.proxyIndex)
                 clipboard.setText(keywordsString)
             }
         }
@@ -245,26 +287,7 @@ Item {
         MenuItem {
             text: i18.n + qsTr("Edit in plain text")
             onTriggered: {
-                var callbackObject = {
-                    onSuccess: function(text, spaceIsSeparator) {
-                        artItemsModel.plainTextEdit(keywordsMoreMenu.artworkIndex, text, spaceIsSeparator)
-                    },
-                    onClose: function() {
-                        filteredArtItemsModel.focusCurrentItemKeywords(keywordsMoreMenu.filteredIndex)
-                        //flv.activateEdit()
-                    }
-                }
-
-                var basicModel = filteredArtItemsModel.getBasicModel(keywordsMoreMenu.filteredIndex)
-                var keywordsString = filteredArtItemsModel.getKeywordsString(keywordsMoreMenu.filteredIndex)
-
-                Common.launchDialog("../Dialogs/PlainTextKeywordsDialog.qml",
-                                    applicationWindow,
-                                    {
-                                        callbackObject: callbackObject,
-                                        keywordsText: keywordsString,
-                                        keywordsModel: basicModel
-                                    });
+                editInPlainText(keywordsMoreMenu.proxyIndex)
             }
         }
 
@@ -272,7 +295,7 @@ Item {
             text: i18.n + qsTr("Clear")
             enabled: keywordsMoreMenu.keywordsCount > 0
             onTriggered: {
-                filteredArtItemsModel.clearKeywords(keywordsMoreMenu.filteredIndex)
+                filteredArtworksListModel.clearKeywords(keywordsMoreMenu.proxyIndex)
             }
         }
     }
@@ -282,11 +305,20 @@ Item {
 
         MenuItem { action: fixSpellingInSelectedAction }
         MenuItem { action: fixDuplicatesInSelectedAction }
+
+        MenuSeparator { }
+
         MenuItem { action: removeMetadataAction }
         MenuItem { action: deleteKeywordsAction }
         MenuItem { action: detachVectorsAction }
+
+        MenuSeparator { }
+
         MenuItem { action: createArchivesAction }
         MenuItem { action: exportToCsvAction }
+
+        MenuSeparator { }
+
         MenuItem { action: reimportMetadataAction }
         MenuItem { action: overwriteMetadataAction }
     }
@@ -313,8 +345,10 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: childrenRect.width
                 property bool isHovered: selectAllMA.containsMouse || selectAllCheckbox.hovered || selectionCombobox.hovered
-                color: (enabled && (isHovered || selectionCombobox.isOpened)) ? (selectionCombobox.isOpened ? uiColors.inactiveControlColor : uiColors.defaultControlColor) : "transparent"
-                enabled: artworkRepository.artworksSourcesCount > 0
+                color: (enabled && (isHovered || selectionCombobox.isOpened)) ?
+                           (selectionCombobox.isOpened ? uiColors.inactiveControlColor :
+                                                         uiColors.defaultControlColor) : "transparent"
+                enabled: artworksRepository.artworksSourcesCount > 0
 
                 MouseArea {
                     id: selectAllMA
@@ -332,20 +366,20 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     defaultBoxColor: (checkBoxWrapper.isHovered && !selectionCombobox.isOpened) ? uiColors.inactiveControlColor : uiColors.defaultControlColor
                     text: ""
-                    checked: filteredArtItemsModel.selectedArtworksCount > 0
+                    checked: filteredArtworksListModel.selectedArtworksCount > 0
 
                     onClicked: {
                         if (checked) {
-                            filteredArtItemsModel.selectFilteredArtworks();
+                            filteredArtworksListModel.selectFilteredArtworks();
                         } else {
-                            filteredArtItemsModel.unselectFilteredArtworks();
+                            filteredArtworksListModel.unselectFilteredArtworks();
                         }
                     }
 
                     Connections {
-                        target: filteredArtItemsModel
+                        target: filteredArtworksListModel
                         onSelectedArtworksCountChanged: {
-                            selectAllCheckbox.checked = filteredArtItemsModel.selectedArtworksCount > 0
+                            selectAllCheckbox.checked = filteredArtworksListModel.selectedArtworksCount > 0
                         }
                     }
                 }
@@ -359,7 +393,7 @@ Item {
                     dropDownWidth: 120
                     showColorSign: false
                     showHeader: false
-                    globalParent: globalHost
+                    globalParent: appHost
                     arrowBackground: "transparent"
                     arrowDisabledBackground: "transparent"
                     dockLeft: true
@@ -378,20 +412,20 @@ Item {
                         i18.n + qsTr("Videos", "select")]
 
                     onComboItemSelected: {
-                        filteredArtItemsModel.selectArtworksEx(index)
+                        dispatcher.dispatch(UICommand.SelectFilteredArtworks, index)
                     }
                 }
             }
 
             StyledText {
-                text: i18.n + qsTr("%1 selected").arg(filteredArtItemsModel.selectedArtworksCount)
-                color: filteredArtItemsModel.selectedArtworksCount > 0 ? uiColors.artworkActiveColor : uiColors.selectedArtworkBackground
+                text: i18.n + qsTr("%1 selected").arg(filteredArtworksListModel.selectedArtworksCount)
+                color: filteredArtworksListModel.selectedArtworksCount > 0 ? uiColors.artworkActiveColor : uiColors.selectedArtworkBackground
                 verticalAlignment: Text.AlignVCenter
-                enabled: mainStackView.areActionsAllowed
+                enabled: appHost.areActionsAllowed
             }
 
             ToolButton {
-                enabled: (filteredArtItemsModel.selectedArtworksCount > 0) && editAction.enabled
+                enabled: (filteredArtworksListModel.selectedArtworksCount > 0) && editAction.enabled
                 normalIcon: uiColors.t + helpersWrapper.getAssetForTheme("Edit_icon_normal.svg", settingsModel.selectedThemeIndex)
                 disabledIcon: uiColors.t + helpersWrapper.getAssetForTheme("Edit_icon_disabled.svg", settingsModel.selectedThemeIndex)
                 hoveredIcon: uiColors.t + helpersWrapper.getAssetForTheme("Edit_icon_hovered.svg", settingsModel.selectedThemeIndex)
@@ -401,17 +435,7 @@ Item {
             }
 
             ToolButton {
-                enabled: (filteredArtItemsModel.selectedArtworksCount > 0) && removeAction.enabled
-                normalIcon: uiColors.t + helpersWrapper.getAssetForTheme("Remove_icon_normal.svg", settingsModel.selectedThemeIndex)
-                disabledIcon: uiColors.t + helpersWrapper.getAssetForTheme("Remove_icon_disabled.svg", settingsModel.selectedThemeIndex)
-                hoveredIcon: uiColors.t + helpersWrapper.getAssetForTheme("Remove_icon_hovered.svg", settingsModel.selectedThemeIndex)
-                clickedIcon: uiColors.t + helpersWrapper.getAssetForTheme("Remove_icon_clicked.svg", settingsModel.selectedThemeIndex)
-                tooltip: i18.n + qsTr("Remove")
-                onClicked: removeAction.trigger()
-            }
-
-            ToolButton {
-                enabled: (filteredArtItemsModel.selectedArtworksCount > 0) && saveAction.enabled
+                enabled: (filteredArtworksListModel.selectedArtworksCount > 0) && saveAction.enabled
                 normalIcon: uiColors.t + helpersWrapper.getAssetForTheme("Save_icon_normal.svg", settingsModel.selectedThemeIndex)
                 disabledIcon: uiColors.t + helpersWrapper.getAssetForTheme("Save_icon_disabled.svg", settingsModel.selectedThemeIndex)
                 hoveredIcon: uiColors.t + helpersWrapper.getAssetForTheme("Save_icon_hovered.svg", settingsModel.selectedThemeIndex)
@@ -421,7 +445,7 @@ Item {
             }
 
             ToolButton {
-                enabled: (filteredArtItemsModel.selectedArtworksCount > 0) && uploadAction.enabled
+                enabled: (filteredArtworksListModel.selectedArtworksCount > 0) && uploadAction.enabled
                 normalIcon: uiColors.t + helpersWrapper.getAssetForTheme("Upload_icon_normal.svg", settingsModel.selectedThemeIndex)
                 disabledIcon: uiColors.t + helpersWrapper.getAssetForTheme("Upload_icon_disabled.svg", settingsModel.selectedThemeIndex)
                 hoveredIcon: uiColors.t + helpersWrapper.getAssetForTheme("Upload_icon_hovered.svg", settingsModel.selectedThemeIndex)
@@ -431,13 +455,24 @@ Item {
             }
 
             ToolButton {
-                enabled: filteredArtItemsModel.selectedArtworksCount > 0
+                enabled: (filteredArtworksListModel.selectedArtworksCount > 0) && (applicationWindow.openedDialogsCount == 0)
                 normalIcon: uiColors.t + helpersWrapper.getAssetForTheme("More_icon_normal.svg", settingsModel.selectedThemeIndex)
                 disabledIcon: uiColors.t + helpersWrapper.getAssetForTheme("More_icon_disabled.svg", settingsModel.selectedThemeIndex)
                 hoveredIcon: uiColors.t + helpersWrapper.getAssetForTheme("More_icon_hovered.svg", settingsModel.selectedThemeIndex)
                 clickedIcon: uiColors.t + helpersWrapper.getAssetForTheme("More_icon_clicked.svg", settingsModel.selectedThemeIndex)
                 tooltip: i18.n + qsTr("More")
                 onClicked: selectedArtworksMoreMenu.popup()
+            }
+
+            ToolButton {
+                objectName: "removeToolButton"
+                enabled: (filteredArtworksListModel.selectedArtworksCount > 0) && removeAction.enabled
+                normalIcon: uiColors.t + helpersWrapper.getAssetForTheme("Remove_icon_normal.svg", settingsModel.selectedThemeIndex)
+                disabledIcon: uiColors.t + helpersWrapper.getAssetForTheme("Remove_icon_disabled.svg", settingsModel.selectedThemeIndex)
+                hoveredIcon: uiColors.t + helpersWrapper.getAssetForTheme("Remove_icon_hovered.svg", settingsModel.selectedThemeIndex)
+                clickedIcon: uiColors.t + helpersWrapper.getAssetForTheme("Remove_icon_clicked.svg", settingsModel.selectedThemeIndex)
+                tooltip: i18.n + qsTr("Remove")
+                onClicked: removeAction.trigger()
             }
 
             Item {
@@ -452,9 +487,10 @@ Item {
                 tooltip: i18.n + qsTr("Support Xpiks")
                 iconWidth: 25
                 iconHeight: 25
+                enabled: applicationWindow.openedDialogsCount == 0
                 visible: {
                     if (switcher.isDonationCampaign1Active) {
-                        if ((artworkRepository.artworksSourcesCount > 0) ||
+                        if ((artworksRepository.artworksSourcesCount > 0) ||
                                 (switcher.isDonateCampaign1LinkClicked)) {
                             return true
                         }
@@ -469,11 +505,11 @@ Item {
             }
 
             LayoutButton {
-                enabled: artworkRepository.artworksSourcesCount > 0
+                enabled: (artworksRepository.artworksSourcesCount > 0) && (applicationWindow.openedDialogsCount == 0)
                 anchors.verticalCenter: parent.verticalCenter
-                isListLayout: applicationWindow.listLayout
+                isListLayout: appHost.listLayout
                 onLayoutChanged: {
-                    applicationWindow.listLayout = !applicationWindow.listLayout
+                    appHost.listLayout = !appHost.listLayout
                     closeAutoComplete()
                 }
             }
@@ -483,18 +519,22 @@ Item {
                 anchors.bottom: parent.bottom
                 anchors.top: parent.top
                 width: 55
-                enabled: artworkRepository.artworksSourcesCount > 0
+                enabled: artworksRepository.artworksSourcesCount > 0
                 color: filterWrapper.isOpened ? uiColors.defaultControlColor : uiColors.defaultDarkColor
 
                 ZoomAmplifier {
                     visible: !filterWrapper.isOpened
-                    enabled: !filterWrapper.isOpened
+                    enabled: (!filterWrapper.isOpened) && (applicationWindow.openedDialogsCount == 0)
                     isPlus: false
                     showPlus: false
                     width: 20
                     height: 20
                     anchors.centerIn: parent
-                    lineColor: enabled ? (searchTabMA.pressed ? uiColors.whiteColor : (searchTabMA.containsMouse ? uiColors.labelActiveForeground : uiColors.labelInactiveForeground)) : uiColors.selectedArtworkBackground
+                    lineColor: enabled ? (searchTabMA.pressed ? uiColors.whiteColor :
+                                                                (searchTabMA.containsMouse ?
+                                                                     uiColors.labelActiveForeground :
+                                                                     uiColors.labelInactiveForeground)) :
+                                         uiColors.selectedArtworkBackground
                     thickness: 2
 
                     CustomTooltip {
@@ -559,6 +599,9 @@ Item {
                         }
 
                         filterWrapper.userOpened = !filterWrapper.userOpened
+                        if (filterWrapper.userOpened) {
+                            filterText.forceActiveFocus()
+                        }
                     }
                 }
             }
@@ -568,7 +611,7 @@ Item {
     Rectangle {
         id: filterWrapper
         property bool userOpened: false
-        property bool isOpened: (filteredArtItemsModel.searchTerm !== "") || userOpened
+        property bool isOpened: (filteredArtworksListModel.searchTerm !== "") || userOpened
         anchors.left: parent.left
         anchors.leftMargin: mainGridComponent.myLeftMargin
         anchors.right: parent.right
@@ -621,23 +664,25 @@ Item {
 
             StyledTextInput {
                 id: filterText
+                objectName: "filterTextInput"
                 width: parent.width - 50
                 height: UIConfig.textInputHeight
                 clip: true
                 anchors.left: zoomIcon.right
                 anchors.leftMargin: 10
-                enabled: artworkRepository.artworksSourcesCount > 0
+                enabled: artworksRepository.artworksSourcesCount > 0
                 selectionColor: uiColors.inputInactiveForeground
                 selectedTextColor: uiColors.whiteColor
                 color: uiColors.inputInactiveForeground
+                focus: true
 
                 onAccepted: {
-                    filteredArtItemsModel.searchTerm = text
+                    filteredArtworksListModel.searchTerm = text
                 }
 
                 Connections {
-                    target: filteredArtItemsModel
-                    onSearchTermChanged: filterText.text = filteredArtItemsModel.searchTerm
+                    target: filteredArtworksListModel
+                    onSearchTermChanged: filterText.text = filteredArtworksListModel.searchTerm
                 }
             }
 
@@ -669,14 +714,15 @@ Item {
 
         StyledBlackButton {
             id: searchButton
+            objectName: "searchButton"
             anchors.left: filterRect.right
             anchors.leftMargin: 20
             anchors.verticalCenter: parent.verticalCenter
             anchors.verticalCenterOffset: 2
             width: 100
             text: i18.n + qsTr("Search")
-            enabled: artworkRepository.artworksSourcesCount > 0
-            onClicked: filteredArtItemsModel.searchTerm = filterText.text
+            enabled: artworksRepository.artworksSourcesCount > 0
+            onClicked: filteredArtworksListModel.searchTerm = filterText.text
         }
     }
 
@@ -690,6 +736,7 @@ Item {
 
         Item {
             id: workflowHost
+            objectName: "workflowHost"
             anchors.fill: parent
             property var autoCompleteBox
 
@@ -728,7 +775,7 @@ Item {
                 Rectangle {
                     anchors.left: parent.left
                     color: uiColors.artworkSavedColor
-                    width: applicationWindow.listLayout ? 6 : 3
+                    width: 3
                     height: parent.height
                 }
 
@@ -747,6 +794,7 @@ Item {
 
                     StyledText {
                         text: i18.n + qsTr("Undo")
+                        objectName: "undoLink"
                         color: undoMA.pressed ? uiColors.linkClickedColor : uiColors.artworkActiveColor
 
                         MouseArea {
@@ -827,15 +875,17 @@ Item {
 
                 GridView {
                     id: artworksHost
-                    property bool isEditingAllowed: filteredArtItemsModel.selectedArtworksCount == 0
+                    objectName: "artworksHost"
+                    // TODO: UX refactoring // filteredArtworksListModel.selectedArtworksCount == 0
+                    property bool isEditingAllowed: true
                     anchors.fill: parent
                     anchors.rightMargin: mainScrollView.areScrollbarsVisible ? 10 : 0
-                    model: filteredArtItemsModel
+                    model: filteredArtworksListModel
                     boundsBehavior: Flickable.StopAtBounds
                     property int cellSpacing: 4
                     property double defaultRowHeight: 205
-                    cellHeight: applicationWindow.listLayout ? (defaultRowHeight + 80*(settingsModel.keywordSizeScale - 1.0) + cellSpacing) : (defaultRowHeight + cellSpacing)
-                    cellWidth: applicationWindow.listLayout ? artworksHost.width : (208 + cellSpacing)
+                    cellHeight: appHost.listLayout ? (defaultRowHeight + 80*(settingsModel.keywordSizeScale - 1.0) + cellSpacing) : (defaultRowHeight + cellSpacing)
+                    cellWidth: appHost.listLayout ? artworksHost.width : (208 + cellSpacing)
                     highlightFollowsCurrentItem: false
                     currentIndex: -1
                     focus: true
@@ -880,8 +930,11 @@ Item {
 
                     delegate: FocusScope {
                         id: wrappersScope
-                        width: applicationWindow.listLayout ? (mainScrollView.areScrollbarsVisible ? (parent.width - 5) : parent.width) : 208
-                        height: applicationWindow.listLayout ? (artworksHost.defaultRowHeight + 80*(settingsModel.keywordSizeScale - 1.0)) : artworksHost.defaultRowHeight
+                        objectName: "artworkDelegate"
+                        property int delegateIndex: index
+                        property variant delegateModel: model
+                        width: appHost.listLayout ? (mainScrollView.areScrollbarsVisible ? (parent.width - 5) : parent.width) : 208
+                        height: appHost.listLayout ? (artworksHost.defaultRowHeight + 80*(settingsModel.keywordSizeScale - 1.0)) : artworksHost.defaultRowHeight
 
                         function updateCurrentIndex() {
                             GridView.view.currentIndex = rowWrapper.delegateIndex
@@ -889,24 +942,20 @@ Item {
 
                         Rectangle {
                             id: rowWrapper
-                            objectName: "artworkDelegate"
                             property bool isHighlighted: isItemSelected || wrappersScope.GridView.isCurrentItem
                             color: isHighlighted ? uiColors.selectedArtworkBackground : uiColors.artworkBackground
-                            property var artworkModel: filteredArtItemsModel.getArtworkMetadata(index)
-                            property var keywordsModel: filteredArtItemsModel.getBasicModel(index)
-                            property int delegateIndex: index
-                            property bool isItemSelected: filteredArtItemsModel.s || isselected
+                            property int delegateIndex: wrappersScope.delegateIndex
+                            property var artworkModel: filteredArtworksListModel.getArtworkObject(delegateIndex)
+                            property var keywordsModel: filteredArtworksListModel.getBasicModelObject(delegateIndex)
+                            property bool isItemSelected: filteredArtworksListModel.s || isselected
                             anchors.fill: parent
 
                             function popupArtworkContextMenu() {
                                 console.log("Context menu for artwork")
                                 artworkContextMenu.filename = filename;
                                 artworkContextMenu.index = rowWrapper.delegateIndex
+                                artworkContextMenu.hasVectorAttached = hasvectorattached
                                 artworkContextMenu.popup()
-                            }
-
-                            function getIndex() {
-                                return filteredArtItemsModel.getOriginalIndex(index)
                             }
 
                             function focusDescription() {
@@ -936,7 +985,7 @@ Item {
 
                             onIsHighlightedChanged: {
                                 if (isHighlighted) {
-                                    filteredArtItemsModel.registerCurrentItem(rowWrapper.delegateIndex)
+                                    filteredArtworksListModel.registerCurrentItem(rowWrapper.delegateIndex)
                                 }
                             }
 
@@ -969,7 +1018,7 @@ Item {
                                 }
 
                                 onCompletionsAvailable: {
-                                    if (!applicationWindow.actionsEnabled) { return }
+                                    if (!appHost.areActionsAllowed) { return }
 
                                     acSource.initializeCompletions()
 
@@ -1001,7 +1050,7 @@ Item {
                                     var isBelow = (tmp.y + popupHeight) < directParent.height;
 
                                     var options = {
-                                        model: acSource.getCompletionsModel(),
+                                        model: acSource.getCompletionsModelObject(),
                                         autoCompleteSource: acSource,
                                         isBelowEdit: isBelow,
                                         "anchors.left": directParent.left,
@@ -1044,14 +1093,14 @@ Item {
 
                                 Item {
                                     id: checkboxSpacer
-                                    width: applicationWindow.listLayout ? 15 : 8
+                                    width: appHost.listLayout ? 15 : 8
                                     anchors.left: isModifiedRectangle.right
                                     anchors.top: parent.top
                                     anchors.bottom: parent.bottom
 
                                     MouseArea {
                                         anchors.fill: parent
-                                        enabled: applicationWindow.listLayout
+                                        enabled: appHost.listLayout
                                         onClicked: {
                                             rowWrapper.switchChecked()
                                             rowWrapper.focusIfNeeded()
@@ -1076,6 +1125,7 @@ Item {
 
                                     StyledCheckbox {
                                         id: itemCheckedCheckbox
+                                        objectName: "itemCheckedCheckbox"
                                         //checked: isselected
                                         focus: false
                                         anchors.left: parent.left
@@ -1086,7 +1136,7 @@ Item {
                                         Component.onCompleted: itemCheckedCheckbox.checked = isselected
 
                                         Connections {
-                                            target: filteredArtItemsModel
+                                            target: filteredArtworksListModel
                                             onAllItemsSelectedChanged: {
                                                 itemCheckedCheckbox.checked = rowWrapper.isItemSelected
                                             }
@@ -1107,7 +1157,7 @@ Item {
 
                                 Item {
                                     id: imageColumnWrapper
-                                    width: applicationWindow.listLayout ? 180 : 160
+                                    width: appHost.listLayout ? 180 : 160
                                     anchors.left: checkboxRectangle.right
                                     anchors.top: parent.top
                                     anchors.bottom: parent.bottom
@@ -1122,11 +1172,12 @@ Item {
 
                                     Item {
                                         anchors.fill: parent
-                                        anchors.leftMargin: applicationWindow.listLayout ? 10 : 0
-                                        anchors.rightMargin: applicationWindow.listLayout ? 15 : 0
+                                        anchors.leftMargin: appHost.listLayout ? 10 : 0
+                                        anchors.rightMargin: appHost.listLayout ? 15 : 0
 
                                         Item {
                                             id: imageHost
+                                            objectName: "imageHost"
                                             anchors.top: parent.top
                                             anchors.topMargin: descriptionText.height + 24
                                             anchors.horizontalCenter: parent.horizontalCenter
@@ -1151,28 +1202,25 @@ Item {
                                                 cache: false
                                             }
 
-                                            Image {
-                                                id: videoTypeIcon
-                                                visible: isvideo
-                                                enabled: isvideo
-                                                source: "qrc:/Graphics/video-icon-s.png"
-                                                fillMode: Image.PreserveAspectCrop
-                                                //sourceSize.width: 300
-                                                //sourceSize.height: 300
-                                                anchors.fill: artworkImage
-                                                cache: true
-                                            }
-
-                                            Image {
-                                                id: imageTypeIcon
-                                                visible: hasvectorattached
-                                                enabled: hasvectorattached
-                                                source: "qrc:/Graphics/vector-icon.svg"
-                                                sourceSize.width: 20
-                                                sourceSize.height: 20
-                                                anchors.left: artworkImage.left
+                                            Rectangle {
+                                                anchors.right: artworkImage.right
                                                 anchors.bottom: artworkImage.bottom
-                                                cache: true
+                                                width: 20
+                                                height: 20
+                                                color: uiColors.defaultDarkColor
+                                                property bool isVideo: isvideo
+                                                property bool isVector: hasvectorattached
+                                                visible: isVideo || isVector
+                                                enabled: isVideo || isVector
+
+                                                Image {
+                                                    id: typeIcon
+                                                    anchors.fill: parent
+                                                    source: parent.isVector ? "qrc:/Graphics/vector-icon.svg" : (parent.isVideo ? "qrc:/Graphics/video-icon.svg" : "")
+                                                    sourceSize.width: 20
+                                                    sourceSize.height: 20
+                                                    cache: true
+                                                }
                                             }
 
                                             Rectangle {
@@ -1188,10 +1236,7 @@ Item {
                                                 acceptedButtons: Qt.LeftButton | Qt.RightButton
 
                                                 function dblClickHandler() {
-                                                    var index = rowWrapper.delegateIndex
-                                                    var originalIndex = rowWrapper.getIndex()
-                                                    var metadata = filteredArtItemsModel.getArtworkMetadata(index)
-                                                    startOneItemEditing(metadata, index, originalIndex)
+                                                    dispatcher.dispatch(UICommand.SetupProxyArtworkEdit, rowWrapper.delegateIndex)
                                                 }
 
                                                 Timer {
@@ -1232,20 +1277,23 @@ Item {
 
                                 Item {
                                     id: columnRectangle
-                                    visible: applicationWindow.listLayout
-                                    anchors.top: applicationWindow.listLayout ? parent.top : undefined
-                                    anchors.bottom: applicationWindow.listLayout ? parent.bottom : undefined
-                                    anchors.left: applicationWindow.listLayout ? imageColumnWrapper.right : undefined
-                                    anchors.leftMargin: applicationWindow.listLayout ? 5 : 0
-                                    anchors.right: applicationWindow.listLayout ? parent.right : undefined
+                                    visible: appHost.listLayout
+                                    anchors.top: appHost.listLayout ? parent.top : undefined
+                                    anchors.bottom: appHost.listLayout ? parent.bottom : undefined
+                                    anchors.left: appHost.listLayout ? imageColumnWrapper.right : undefined
+                                    anchors.leftMargin: appHost.listLayout ? 5 : 0
+                                    anchors.right: appHost.listLayout ? parent.right : undefined
 
                                     Item {
                                         id: columnLayout
+                                        objectName: "columnLayout"
                                         anchors.fill: parent
                                         anchors.leftMargin: 0
                                         anchors.rightMargin: 20
                                         anchors.topMargin: 20
                                         property bool isWideEnough: width > 450
+                                        property bool isWideForLinks: width > 600
+                                        property real inputWidth: isWideEnough ? ((width / 2) - 12) : width
 
                                         StyledText {
                                             id: descriptionText
@@ -1277,15 +1325,14 @@ Item {
                                             anchors.leftMargin: 3
                                             text: "*"
                                             color: uiColors.destructiveColor
-                                            visible: rowWrapper.keywordsModel.hasTitleSpellErrors
+                                            visible: rowWrapper.keywordsModel.hasTitleSpellErrors && columnLayout.isWideEnough
                                         }
 
                                         Rectangle {
                                             id: descriptionRect
                                             height: 30
                                             anchors.left: parent.left
-                                            anchors.right: titleRect.left
-                                            anchors.rightMargin: columnLayout.isWideEnough ? 20 : 0
+                                            width: columnLayout.inputWidth
                                             anchors.top: descriptionText.bottom
                                             anchors.topMargin: 3
                                             color: rowWrapper.isHighlighted ? uiColors.inputBackgroundColor : uiColors.inputInactiveBackground
@@ -1319,6 +1366,7 @@ Item {
 
                                                 StyledTextEdit {
                                                     id: descriptionTextInput
+                                                    objectName: "descriptionTextInput"
                                                     width: paintedWidth > descriptionFlick.width ? paintedWidth : descriptionFlick.width
                                                     height: descriptionFlick.height
                                                     text: description
@@ -1329,7 +1377,7 @@ Item {
 
                                                     onActionRightClicked: {
                                                         console.log("Context menu for add word " + rightClickedWord)
-                                                        var showAddToDict = filteredArtItemsModel.hasDescriptionWordSpellError(rowWrapper.delegateIndex, rightClickedWord)
+                                                        var showAddToDict = filteredArtworksListModel.hasDescriptionWordSpellError(rowWrapper.delegateIndex, rightClickedWord)
                                                         wordRightClickMenu.showAddToDict = showAddToDict
                                                         wordRightClickMenu.word = rightClickedWord
                                                         wordRightClickMenu.showExpandPreset = false
@@ -1352,7 +1400,7 @@ Item {
                                                     }
 
                                                     Keys.onBacktabPressed: {
-                                                        filteredArtItemsModel.focusPreviousItem(rowWrapper.delegateIndex)
+                                                        filteredArtworksListModel.focusPreviousItem(rowWrapper.delegateIndex)
                                                     }
 
                                                     Keys.onPressed: {
@@ -1374,8 +1422,9 @@ Item {
                                                     }
 
                                                     Component.onCompleted: {
-                                                        var index = rowWrapper.getIndex()
-                                                        artItemsModel.initDescriptionHighlighting(index, descriptionTextInput.textDocument)
+                                                        uiManager.initDescriptionHighlighting(
+                                                                    filteredArtworksListModel.getBasicModelObject(rowWrapper.delegateIndex),
+                                                                    descriptionTextInput.textDocument)
                                                     }
 
                                                     onCursorRectangleChanged: descriptionFlick.ensureVisible(cursorRectangle)
@@ -1396,7 +1445,7 @@ Item {
                                             height: 30
                                             visible: columnLayout.isWideEnough
                                             enabled: columnLayout.isWideEnough && artworksHost.isEditingAllowed
-                                            width: columnLayout.isWideEnough ? ((columnLayout.width / 2) - 10) : 0
+                                            width: columnLayout.inputWidth
                                             anchors.right: parent.right
                                             anchors.top: descriptionText.bottom
                                             anchors.topMargin: 3
@@ -1430,6 +1479,7 @@ Item {
 
                                                 StyledTextEdit {
                                                     id: titleTextInput
+                                                    objectName: "titleTextInput"
                                                     width: paintedWidth > titleFlick.width ? paintedWidth : titleFlick.width
                                                     height: titleFlick.height
                                                     text: title
@@ -1440,7 +1490,7 @@ Item {
 
                                                     onActionRightClicked: {
                                                         console.log("Context menu for add word " + rightClickedWord)
-                                                        var showAddToDict = filteredArtItemsModel.hasTitleWordSpellError(rowWrapper.delegateIndex, rightClickedWord)
+                                                        var showAddToDict = filteredArtworksListModel.hasTitleWordSpellError(rowWrapper.delegateIndex, rightClickedWord)
                                                         wordRightClickMenu.showAddToDict = showAddToDict
                                                         wordRightClickMenu.word = rightClickedWord
                                                         wordRightClickMenu.showExpandPreset = false
@@ -1481,8 +1531,9 @@ Item {
                                                     }
 
                                                     Component.onCompleted: {
-                                                        var index = rowWrapper.getIndex()
-                                                        artItemsModel.initTitleHighlighting(index, titleTextInput.textDocument)
+                                                        uiManager.initTitleHighlighting(
+                                                                    filteredArtworksListModel.getBasicModelObject(rowWrapper.delegateIndex),
+                                                                    titleTextInput.textDocument)
                                                     }
 
                                                     onCursorRectangleChanged: titleFlick.ensureVisible(cursorRectangle)
@@ -1535,29 +1586,35 @@ Item {
                                             border.color: uiColors.artworkActiveColor
                                             border.width: flv.isFocused ? 1 : 0
                                             color: rowWrapper.isHighlighted ? uiColors.inputBackgroundColor : uiColors.inputInactiveBackground
+                                            state: ""
 
                                             function removeKeyword(index) {
-                                                artItemsModel.removeKeywordAt(rowWrapper.getIndex(), index)
+                                                filteredArtworksListModel.removeKeywordAt(rowWrapper.delegateIndex, index)
                                             }
 
                                             function removeLastKeyword() {
-                                                artItemsModel.removeLastKeyword(rowWrapper.getIndex())
+                                                filteredArtworksListModel.removeLastKeyword(rowWrapper.delegateIndex)
                                             }
 
                                             function appendKeyword(keyword) {
-                                                artItemsModel.appendKeyword(rowWrapper.getIndex(), keyword)
+                                                var added = filteredArtworksListModel.appendKeyword(rowWrapper.delegateIndex, keyword)
+                                                if (!added) {
+                                                    keywordsWrapper.state = "blinked"
+                                                    blinkTimer.start()
+                                                }
                                             }
 
                                             function pasteKeywords(keywords) {
-                                                artItemsModel.pasteKeywords(rowWrapper.getIndex(), keywords)
+                                                filteredArtworksListModel.pasteKeywords(rowWrapper.delegateIndex, keywords)
                                             }
 
                                             function expandLastKeywordAsPreset() {
-                                                artItemsModel.expandLastAsPreset(rowWrapper.getIndex())
+                                                filteredArtworksListModel.expandLastAsPreset(rowWrapper.delegateIndex)
                                             }
 
                                             EditableTags {
                                                 id: flv
+                                                objectName: "editableTags"
                                                 model: rowWrapper.keywordsModel
                                                 anchors.fill: parent
                                                 property int keywordHeight: uiManager.keywordHeight
@@ -1567,12 +1624,17 @@ Item {
                                                 enabled: artworksHost.isEditingAllowed
 
                                                 function acceptCompletion(completionID) {
-                                                    var accepted = artItemsModel.acceptCompletionAsPreset(rowWrapper.getIndex(), completionID);
-                                                    if (!accepted) {
+                                                    // TODO: move to signal
+                                                    if (acSource.isPreset(completionID)) {
+                                                        dispatcher.dispatch(UICommand.AcceptPresetCompletionForArtwork,
+                                                                            {
+                                                                                "index": rowWrapper.delegateIndex,
+                                                                                "completion": completionID
+                                                                            })
+                                                        flv.editControl.acceptCompletion('')
+                                                    } else {
                                                         var completion = acSource.getCompletion(completionID)
                                                         flv.editControl.acceptCompletion(completion)
-                                                    } else {
-                                                        flv.editControl.acceptCompletion('')
                                                     }
                                                 }
 
@@ -1590,7 +1652,7 @@ Item {
                                                     onActionDoubleClicked: {
                                                         var callbackObject = {
                                                             onSuccess: function(replacement) {
-                                                                artItemsModel.editKeyword(rowWrapper.getIndex(), kw.delegateIndex, replacement)
+                                                                filteredArtworksListModel.editKeyword(rowWrapper.delegateIndex, kw.delegateIndex, replacement)
                                                             },
                                                             onClose: function() {
                                                                 try {
@@ -1601,13 +1663,13 @@ Item {
                                                             }
                                                         }
 
-                                                        Common.launchDialog("../Dialogs/EditKeywordDialog.qml",
-                                                                            applicationWindow,
+                                                        Common.launchDialog("Dialogs/EditKeywordDialog.qml",
+                                                                            componentParent,
                                                                             {
                                                                                 callbackObject: callbackObject,
                                                                                 previousKeyword: keyword,
                                                                                 keywordIndex: kw.delegateIndex,
-                                                                                keywordsModel: filteredArtItemsModel.getBasicModel(rowWrapper.delegateIndex)
+                                                                                keywordsModel: filteredArtworksListModel.getBasicModelObject(rowWrapper.delegateIndex)
                                                                             })
                                                     }
 
@@ -1617,7 +1679,7 @@ Item {
                                                         wordRightClickMenu.word = keyword
                                                         filteredPresetsModel.searchTerm = keyword
                                                         wordRightClickMenu.showExpandPreset = (filteredPresetsModel.getItemsCount() !== 0 )
-                                                        wordRightClickMenu.artworkIndex = rowWrapper.getIndex()
+                                                        wordRightClickMenu.proxyIndex = rowWrapper.delegateIndex
                                                         wordRightClickMenu.keywordIndex = kw.delegateIndex
                                                         wordRightClickMenu.popupIfNeeded()
                                                     }
@@ -1646,14 +1708,17 @@ Item {
                                                 }
 
                                                 onTabPressed: {
-                                                    filteredArtItemsModel.focusNextItem(rowWrapper.delegateIndex)
+                                                    filteredArtworksListModel.focusNextItem(rowWrapper.delegateIndex)
                                                 }
 
                                                 onCopyRequest: clipboard.setText(keywordsstring)
 
                                                 onCompletionRequested: {
-                                                    filteredArtItemsModel.generateCompletions(prefix,
-                                                                                              rowWrapper.delegateIndex)
+                                                    dispatcher.dispatch(UICommand.GenerateCompletionsForArtwork,
+                                                                        {
+                                                                            "prefix": prefix,
+                                                                            "index": rowWrapper.delegateIndex
+                                                                        })
                                                 }
 
                                                 onExpandLastAsPreset: {
@@ -1667,7 +1732,7 @@ Item {
 
                                                 onRightClickedInside: {
                                                     filteredPresetsModel.searchTerm = ''
-                                                    presetsMenu.artworkIndex = rowWrapper.getIndex()
+                                                    presetsMenu.proxyIndex = rowWrapper.delegateIndex
                                                     presetsMenu.popup()
                                                 }
                                             }
@@ -1679,28 +1744,40 @@ Item {
                                                 flickable: flv
                                                 handleColor: rowWrapper.isHighlighted ? uiColors.artworkActiveColor : uiColors.panelSelectedColor
                                             }
+
+                                            Timer {
+                                                id: blinkTimer
+                                                repeat: false
+                                                interval: 400
+                                                triggeredOnStart: false
+                                                onTriggered: keywordsWrapper.state = ""
+                                            }
+
+                                            states: State {
+                                                name: "blinked";
+                                                PropertyChanges {
+                                                    target: keywordsWrapper;
+                                                    border.width: 0
+                                                }
+                                            }
                                         }
 
-                                        RowLayout {
-                                            anchors.left: parent.left
+                                        Row {
                                             anchors.right: parent.right
                                             anchors.rightMargin: 3
                                             anchors.top: keywordsWrapper.bottom
                                             anchors.topMargin: 3
                                             spacing: 5
 
-                                            Item {
-                                                Layout.fillWidth: true
-                                            }
-
                                             StyledLink {
                                                 id: fixSpellingText
+                                                objectName: "fixSpellingLink"
                                                 text: i18.n + qsTr("Fix spelling")
                                                 property bool canBeShown: rowWrapper.keywordsModel ? rowWrapper.keywordsModel.hasAnySpellingError : false
                                                 enabled: canBeShown
                                                 visible: canBeShown
                                                 isActive: true //rowWrapper.isHighlighted
-                                                onClicked: { fixSpelling(rowWrapper.getIndex()) }
+                                                onClicked: { fixSpelling(rowWrapper.delegateIndex) }
                                             }
 
                                             StyledText {
@@ -1718,7 +1795,7 @@ Item {
                                                 enabled: canBeShown
                                                 visible: canBeShown
                                                 isActive: true //rowWrapper.isHighlighted
-                                                onClicked: { fixDuplicatesAction(rowWrapper.getIndex()) }
+                                                onClicked: { fixDuplicatesAction(rowWrapper.delegateIndex) }
                                             }
 
                                             StyledText {
@@ -1732,10 +1809,12 @@ Item {
                                             StyledLink {
                                                 id: suggestLink
                                                 text: i18.n + qsTr("Suggest keywords")
-                                                property bool canBeShown: (keywordscount < warningsModel.minKeywordsCount) && (!removeDuplicatesText.canBeShown) && (!fixSpellingText.canBeShown)
+                                                property bool canBeShown: ((keywordscount < warningsModel.minKeywordsCount) &&
+                                                                           !removeDuplicatesText.canBeShown &&
+                                                                           !fixSpellingText.canBeShown) || (columnLayout.isWideForLinks)
                                                 visible: canBeShown
                                                 enabled: canBeShown
-                                                onClicked: { suggestKeywords(rowWrapper.getIndex()) }
+                                                onClicked: { suggestKeywords(rowWrapper.delegateIndex) }
                                             }
 
                                             StyledText {
@@ -1749,7 +1828,7 @@ Item {
                                             StyledLink {
                                                 id: copyLink
                                                 text: i18.n + qsTr("Copy")
-                                                property bool canBeShown: (keywordscount > 0) && (!suggestLink.canBeShown) && (!removeDuplicatesText.canBeShown) && (!fixSpellingText.canBeShown)
+                                                property bool canBeShown: (keywordscount > 0) && (columnLayout.isWideForLinks)
                                                 enabled: canBeShown
                                                 visible: canBeShown
                                                 onClicked: clipboard.setText(keywordsstring)
@@ -1763,13 +1842,35 @@ Item {
                                                 verticalAlignment: Text.AlignVCenter
                                             }
 
+                                            StyledLink {
+                                                id: clearLink
+                                                text: i18.n + qsTr("Clear")
+                                                property bool canBeShown: (keywordscount > 0) && (columnLayout.isWideForLinks)
+                                                enabled: canBeShown
+                                                visible: canBeShown
+                                                onClicked: filteredArtworksListModel.clearKeywords(rowWrapper.delegateIndex)
+                                            }
+
+                                            StyledText {
+                                                visible: clearLink.canBeShown
+                                                enabled: clearLink.canBeShown
+                                                text: "|"
+                                                isActive: rowWrapper.isHighlighted
+                                                verticalAlignment: Text.AlignVCenter
+                                            }
+
                                             Item {
-                                                width: childrenRect.width
+                                                // not childrenRect.width because of localization/width issues
+                                                width: moreLink.width + moreTriangle.width + moreTriangle.anchors.leftMargin
                                                 height: moreLink.height
 
                                                 StyledText {
                                                     id: moreLink
-                                                    color: enabled ? (moreMA.pressed ? uiColors.linkClickedColor : uiColors.artworkActiveColor) : (isActive ? uiColors.labelActiveForeground : uiColors.labelInactiveForeground)
+                                                    color: enabled ? (moreMA.pressed ?
+                                                                          uiColors.linkClickedColor :
+                                                                          uiColors.artworkActiveColor) :
+                                                                     (isActive ? uiColors.labelActiveForeground :
+                                                                                 uiColors.labelInactiveForeground)
                                                     text: i18.n + qsTr("More")
                                                     property bool isActive: true //rowWrapper.isHighlighted
                                                     anchors.verticalCenter: parent.verticalCenter
@@ -1777,6 +1878,7 @@ Item {
                                                 }
 
                                                 TriangleElement {
+                                                    id: moreTriangle
                                                     anchors.left: moreLink.right
                                                     anchors.leftMargin: 4
                                                     anchors.verticalCenter: parent.verticalCenter
@@ -1797,10 +1899,11 @@ Item {
                                                         // strange bug with clicking on the keywords field
                                                         if (!containsMouse) { return; }
 
+                                                        filteredArtworksListModel.registerCurrentItem(rowWrapper.delegateIndex)
+
                                                         keywordsMoreMenu.editableTags = flv
                                                         keywordsMoreMenu.keywordsCount = keywordscount
-                                                        keywordsMoreMenu.artworkIndex = rowWrapper.getIndex()
-                                                        keywordsMoreMenu.filteredIndex = rowWrapper.delegateIndex
+                                                        keywordsMoreMenu.proxyIndex = rowWrapper.delegateIndex
                                                         keywordsMoreMenu.hasSpellingErrors = rowWrapper.keywordsModel ? rowWrapper.keywordsModel.hasAnySpellingErrors() : false
                                                         keywordsMoreMenu.hasDuplicates = rowWrapper.keywordsModel ? rowWrapper.keywordsModel.hasDuplicates : false
                                                         keywordsMoreMenu.popup()
@@ -1815,13 +1918,21 @@ Item {
                     }
 
                     Connections {
-                        target: artItemsModel
+                        target: artworksListModel
                         onArtworksChanged: artworksHost.forceUpdateArtworks(needToMoveCurrentItem)
                     }
 
                     Connections {
-                        target: filteredArtItemsModel
+                        target: filteredArtworksListModel
                         onAfterInvalidateFilter: {
+                            artworksHost.forceUpdateArtworks(true)
+                            artworksHost.positionViewAtBeginning()
+                        }
+                    }
+
+                    Connections {
+                        target: artworksRepository
+                        onDirectoriesFiltered: {
                             artworksHost.forceUpdateArtworks(true)
                             artworksHost.positionViewAtBeginning()
                         }
@@ -1851,7 +1962,7 @@ Item {
                 id: commonCenterItem
                 visible: {
                     if (artworksHost.count == 0) {
-                        if (artworkRepository.artworksSourcesCount > 0) {
+                        if (artworksRepository.artworksSourcesCount > 0) {
                             return true
                         }
 

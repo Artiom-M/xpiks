@@ -2,10 +2,11 @@
 #define INTEGRATIONTESTBASE
 
 #include <QString>
-#include <QDebug>
-#include <QDir>
-#include "../../xpiks-qt/Commands/commandmanager.h"
-#include "testshelpers.h"
+#include <QHash>
+#include <QUrl>
+#include "integrationtestsenvironment.h"
+
+class XpiksTestsApp;
 
 #define VERIFY(condition, message) \
     if (!(condition)) {\
@@ -15,40 +16,25 @@
 
 class IntegrationTestBase {
 public:
-    IntegrationTestBase(Commands::CommandManager *commandManager):
-        m_CommandManager(commandManager)
-    {}
-    virtual ~IntegrationTestBase() {}
+    IntegrationTestBase(IntegrationTestsEnvironment &environment,
+                        XpiksTestsApp &testsApp);
+    virtual ~IntegrationTestBase() { }
 
+public:
     virtual QString testName() = 0;
     virtual void setup() = 0;
     virtual int doTest() = 0;
-    virtual void teardown() { m_CommandManager->cleanup(); }
+    virtual void teardown();
 
 protected:
-    QUrl getFilePathForTest(const QString &prefix) {
-        return QUrl::fromLocalFile(findFullPathForTests(prefix));
-    }
-
-    QUrl getDirPathForTest(const QString &prefix) {
-        QString path = prefix;
-        if (path.startsWith('/')) { path.remove(0, 1); }
-        QDir dir(path);
-        int tries = 6;
-        while (tries--) {
-            if (!dir.exists()) {
-                path = "../" + prefix;
-                dir.setPath(path);
-            } else {
-                return QUrl::fromLocalFile(dir.absolutePath());
-            }
-        }
-
-        return QUrl::fromLocalFile(QDir(prefix).absolutePath());
-    }
+    QUrl setupFilePathForTest(const QString &prefix, bool withVector=false);
+    QUrl getFilePathForTest(const QString &prefix);
+    QUrl getDirPathForTest(const QString &prefix);
+    bool getIsInMemoryOnly() const { return m_Environment.getIsInMemoryOnly(); }
 
 protected:
-    Commands::CommandManager *m_CommandManager;
+    XpiksTestsApp &m_TestsApp;
+    IntegrationTestsEnvironment &m_Environment;
 };
 
 #endif // INTEGRATIONTESTBASE

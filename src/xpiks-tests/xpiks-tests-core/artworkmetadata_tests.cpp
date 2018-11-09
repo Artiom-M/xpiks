@@ -1,13 +1,27 @@
 #include "artworkmetadata_tests.h"
-#include <QSignalSpy>
-#include <QList>
-#include <QVariant>
-#include <QSemaphore>
-#include "Mocks/artworkmetadatamock.h"
-#include "../../xpiks-qt/MetadataIO/cachedartwork.h"
-#include "../../xpiks-qt/MetadataIO/originalmetadata.h"
+
+#include <cstddef>
+#include <memory>
 #include <thread>
-#include "../../xpiks-qt/Helpers/threadhelpers.h"
+#include <vector>
+
+#include <QDebug>
+#include <QDir>
+#include <QFileInfo>
+#include <QLatin1String>
+#include <QList>
+#include <QSet>
+#include <QSignalSpy>
+#include <QStringList>
+#include <QVariant>
+#include <QtGlobal>
+
+#include "Artworks/basickeywordsmodel.h"
+#include "Helpers/threadhelpers.h"
+#include "MetadataIO/cachedartwork.h"
+#include "MetadataIO/originalmetadata.h"
+
+#include "Mocks/artworkmetadatamock.h"
 
 MetadataIO::CachedArtwork CA(const QString &title, const QString &description, const QStringList &keywords) {
     MetadataIO::CachedArtwork result;
@@ -522,7 +536,7 @@ void ArtworkMetadataTests::addNewKeywordsEmitsModifiedTest() {
     metadata.initAsEmpty();
 
     QSignalSpy modifiedSpy(&metadata, SIGNAL(modifiedChanged(bool)));
-    QSignalSpy addedSpy(metadata.getBasicModel(), SIGNAL(rowsInserted(QModelIndex,int,int)));
+    QSignalSpy addedSpy(&metadata.getBasicModel(), SIGNAL(rowsInserted(QModelIndex,int,int)));
 
     size_t addedCount = metadata.appendKeywords(QStringList() << "keyword1" << "keyword2");
 
@@ -546,7 +560,7 @@ void ArtworkMetadataTests::addExistingKeywordsDoesNotEmitModifiedTest() {
     QCOMPARE(addedCount, (size_t)2);
 
     QSignalSpy modifiedSpy(&metadata, SIGNAL(modifiedChanged(bool)));
-    QSignalSpy addedSpy(metadata.getBasicModel(), SIGNAL(rowsInserted(QModelIndex,int,int)));
+    QSignalSpy addedSpy(&metadata.getBasicModel(), SIGNAL(rowsInserted(QModelIndex,int,int)));
 
     addedCount = metadata.appendKeywords(QStringList() << "keyword1" << "keyword2");
 
@@ -561,7 +575,7 @@ void ArtworkMetadataTests::addOneNewKeywordEmitsModifiedTest() {
     metadata.initAsEmpty();
 
     QSignalSpy modifiedSpy(&metadata, SIGNAL(modifiedChanged(bool)));
-    QSignalSpy addedSpy(metadata.getBasicModel(), SIGNAL(rowsInserted(QModelIndex,int,int)));
+    QSignalSpy addedSpy(&metadata.getBasicModel(), SIGNAL(rowsInserted(QModelIndex,int,int)));
 
     bool added = metadata.appendKeyword("keyword1");
 
@@ -585,7 +599,7 @@ void ArtworkMetadataTests::addOneExistingKeywordDoesNotEmitModifiedTest() {
     QCOMPARE(added, true);
 
     QSignalSpy modifiedSpy(&metadata, SIGNAL(modifiedChanged(bool)));
-    QSignalSpy addedSpy(metadata.getBasicModel(), SIGNAL(rowsInserted(QModelIndex,int,int)));
+    QSignalSpy addedSpy(&metadata.getBasicModel(), SIGNAL(rowsInserted(QModelIndex,int,int)));
 
     added = metadata.appendKeyword("keyword2");
 
@@ -598,7 +612,7 @@ void ArtworkMetadataTests::addOneExistingKeywordDoesNotEmitModifiedTest() {
 void ArtworkMetadataTests::removeKeywordFromEmptyTest() {
     Mocks::ArtworkMetadataMock metadata("file.jpg");
     QSignalSpy modifiedSpy(&metadata, SIGNAL(modifiedChanged(bool)));
-    QSignalSpy removedSpy(metadata.getBasicModel(), SIGNAL(rowsRemoved(QModelIndex,int,int)));
+    QSignalSpy removedSpy(&metadata.getBasicModel(), SIGNAL(rowsRemoved(QModelIndex,int,int)));
 
     QString keyword;
     bool removed = metadata.removeKeywordAt(0, keyword);
@@ -611,7 +625,7 @@ void ArtworkMetadataTests::removeKeywordFromEmptyTest() {
 void ArtworkMetadataTests::removeLastKeywordFromEmptyTest() {
     Mocks::ArtworkMetadataMock metadata("file.jpg");
     QSignalSpy modifiedSpy(&metadata, SIGNAL(modifiedChanged(bool)));
-    QSignalSpy removedSpy(metadata.getBasicModel(), SIGNAL(rowsRemoved(QModelIndex,int,int)));
+    QSignalSpy removedSpy(&metadata.getBasicModel(), SIGNAL(rowsRemoved(QModelIndex,int,int)));
 
     QString keyword;
     bool removed = metadata.removeLastKeyword(keyword);
@@ -626,7 +640,7 @@ void ArtworkMetadataTests::removeActualKeywordTest() {
     metadata.initAsEmpty();
 
     QSignalSpy modifiedSpy(&metadata, SIGNAL(modifiedChanged(bool)));
-    QSignalSpy removedSpy(metadata.getBasicModel(), SIGNAL(rowsRemoved(QModelIndex,int,int)));
+    QSignalSpy removedSpy(&metadata.getBasicModel(), SIGNAL(rowsRemoved(QModelIndex,int,int)));
 
     metadata.appendKeyword("keyword1");
 
@@ -650,7 +664,7 @@ void ArtworkMetadataTests::removeLastActualKeywordTest() {
     metadata.initAsEmpty();
 
     QSignalSpy modifiedSpy(&metadata, SIGNAL(modifiedChanged(bool)));
-    QSignalSpy removedSpy(metadata.getBasicModel(), SIGNAL(rowsRemoved(QModelIndex,int,int)));
+    QSignalSpy removedSpy(&metadata.getBasicModel(), SIGNAL(rowsRemoved(QModelIndex,int,int)));
 
     metadata.appendKeyword("keyword1");
 
@@ -808,4 +822,125 @@ void ArtworkMetadataTests::removeKeywordsMarksModifiedTest() {
     result = metadata.removeKeywords(QSet<QString>() << "keyword2");
     QVERIFY(result);
     QVERIFY(metadata.isModified());
+}
+
+void ArtworkMetadataTests::swapKeywordsBasicTest() {
+    Mocks::ArtworkMetadataMock artwork("file.jpg");
+    artwork.initAsEmpty();
+    const QString first = "keyword1";
+    const QString second = "keyword2";
+    artwork.appendKeywords(QStringList() << first << second);
+    artwork.getBasicModel().getRawKeywords()[0].m_IsCorrect = false;
+    artwork.getBasicModel().getRawKeywords()[1].m_HasDuplicates = true;
+
+    QCOMPARE(first, artwork.getBasicModel().getKeywordAt(0));
+    QCOMPARE(second, artwork.getBasicModel().getKeywordAt(1));
+
+    bool result = artwork.moveKeyword(1, 0);
+    QVERIFY(result);
+    QVERIFY(artwork.isModified());
+
+    auto keywords = artwork.getBasicModel().getRawKeywords();
+
+    QCOMPARE(second, artwork.getBasicModel().getKeywordAt(0));
+    QCOMPARE(bool(keywords[0].m_IsCorrect), true);
+    QCOMPARE(bool(keywords[0].m_HasDuplicates), true);
+    QCOMPARE(first, artwork.getBasicModel().getKeywordAt(1));
+    QCOMPARE(bool(keywords[1].m_IsCorrect), false);
+    QCOMPARE(bool(keywords[1].m_HasDuplicates), false);
+}
+
+void ArtworkMetadataTests::dontSwapKeywordsTest() {
+    Mocks::ArtworkMetadataMock artwork("file.jpg");
+    QString first = "keyword1";
+    QString second = "keyword2";
+    artwork.initialize("", "", QStringList() << first << second);
+
+    QCOMPARE(first, artwork.getBasicModel().getKeywordAt(0));
+    QCOMPARE(second, artwork.getBasicModel().getKeywordAt(1));
+
+    bool result = artwork.moveKeyword(2, 0);
+    QVERIFY(!result);
+    QVERIFY(!artwork.isModified());
+
+    QCOMPARE(first, artwork.getBasicModel().getKeywordAt(0));
+    QCOMPARE(second, artwork.getBasicModel().getKeywordAt(1));
+}
+
+void ArtworkMetadataTests::moveKeywordForwardTest() {
+    Mocks::ArtworkMetadataMock artwork("file.jpg");
+    artwork.initAsEmpty();
+
+    QStringList original = QStringList() << "first" << "second" << "third" << "forth";
+    artwork.appendKeywords(original);
+
+    bool result = artwork.moveKeyword(3, 1);
+    QVERIFY(result);
+    QVERIFY(artwork.isModified());
+
+    auto keywords = artwork.getBasicModel().getKeywords();
+
+    QStringList expected = QStringList() << "first" << "forth" << "second" << "third";
+    QCOMPARE(keywords, expected);
+}
+
+void ArtworkMetadataTests::moveBackToFrontTest() {
+    Mocks::ArtworkMetadataMock artwork("file.jpg");
+    artwork.initAsEmpty();
+
+    QStringList original = QStringList() << "first" << "second" << "third" << "forth";
+    artwork.appendKeywords(original);
+
+    bool result = artwork.moveKeyword(3, 0);
+    QVERIFY(result);
+    QVERIFY(artwork.isModified());
+
+    auto keywords = artwork.getBasicModel().getKeywords();
+
+    QStringList expected = QStringList() << "forth" << "first" << "second" << "third";
+    QCOMPARE(keywords, expected);
+}
+
+void ArtworkMetadataTests::moveFrontToBackTest() {
+    Mocks::ArtworkMetadataMock artwork("file.jpg");
+    artwork.initAsEmpty();
+
+    QStringList original = QStringList() << "first" << "second" << "third" << "forth";
+    artwork.appendKeywords(original);
+
+    bool result = artwork.moveKeyword(0, 3);
+    QVERIFY(result);
+    QVERIFY(artwork.isModified());
+
+    auto keywords = artwork.getBasicModel().getKeywords();
+
+    QStringList expected = QStringList() << "second" << "third" << "forth" << "first";
+    QCOMPARE(keywords, expected);
+}
+
+void ArtworkMetadataTests::moveMiddleToBackTest() {
+    Mocks::ArtworkMetadataMock artwork("file.jpg");
+    artwork.initAsEmpty();
+
+    QStringList original = QStringList() << "first" << "second" << "third" << "forth";
+    artwork.appendKeywords(original);
+
+    bool result = artwork.moveKeyword(2, 3);
+    QVERIFY(result);
+    QVERIFY(artwork.isModified());
+
+    auto keywords = artwork.getBasicModel().getKeywords();
+
+    QStringList expected = QStringList() << "first" << "second" << "forth" << "third";
+    QCOMPARE(keywords, expected);
+}
+
+void ArtworkMetadataTests::moveSameSpotTest() {
+    Mocks::ArtworkMetadataMock artwork("file.jpg");
+
+    artwork.initialize("", "", QStringList() << "first" << "second" << "third" << "forth");
+
+    bool result = artwork.moveKeyword(2, 2);
+    QVERIFY(!artwork.isModified());
+    QVERIFY(!result);
 }

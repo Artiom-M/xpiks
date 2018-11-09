@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,10 +9,14 @@
  */
 
 #include "cachedartwork.h"
-#include "../Models/artworkmetadata.h"
-#include "../Models/imageartwork.h"
-#include "../Models/videoartwork.h"
-#include "../Common/version.h"
+
+#include <QDataStream>
+#include <QList>
+
+#include "Artworks/artworkmetadata.h"
+#include "Artworks/imageartwork.h"
+#include "Artworks/videoartwork.h"
+#include "Common/version.h"
 
 namespace MetadataIO {
 
@@ -27,7 +31,7 @@ namespace MetadataIO {
         initSerializationVersion();
     }
 
-    CachedArtwork::CachedArtwork(Models::ArtworkMetadata *metadata):
+    CachedArtwork::CachedArtwork(std::shared_ptr<Artworks::ArtworkMetadata> const &artwork):
         m_Version(0),
         m_Flags(0),
         m_CategoryID_1(0),
@@ -37,20 +41,20 @@ namespace MetadataIO {
 
         m_ArtworkType = Unknown;
 
-        m_FilesizeBytes = metadata->getFileSize();
-        m_Filepath = metadata->getFilepath();
-        m_Title = metadata->getTitle();
-        m_Description = metadata->getDescription();
-        m_Keywords = metadata->getKeywords();
-        m_ThumbnailPath = metadata->getThumbnailPath();
+        m_FilesizeBytes = artwork->getFileSize();
+        m_Filepath = artwork->getFilepath();
+        m_Title = artwork->getTitle();
+        m_Description = artwork->getDescription();
+        m_Keywords = artwork->getKeywords();
+        m_ThumbnailPath = artwork->getThumbnailPath();
 
-        Models::ImageArtwork *image = dynamic_cast<Models::ImageArtwork*>(metadata);
+        auto image = std::dynamic_pointer_cast<Artworks::ImageArtwork>(artwork);
         if (image != nullptr) {
             m_ArtworkType = image->hasVectorAttached() ? Vector : Image;
             m_AttachedVector = image->getAttachedVectorPath();
             m_CreationTime = image->getDateTimeOriginal();
         } else {
-            Models::VideoArtwork *video = dynamic_cast<Models::VideoArtwork*>(metadata);
+            auto video = std::dynamic_pointer_cast<Artworks::VideoArtwork>(artwork);
             Q_ASSERT(video != nullptr);
             m_ArtworkType = Video;
             m_CodecName = video->getCodecName();
@@ -109,7 +113,7 @@ namespace MetadataIO {
 
     QDataStream &operator<<(QDataStream &out, const CachedArtwork &v) {
         // TODO: update before release to Qt 5.9
-        Q_ASSERT(!XPIKS_VERSION_CHECK(1, 5, 0));
+        Q_ASSERT(!XPIKS_VERSION_CHECK(1, 6, 0));
 #ifndef TRAVIS_CI
         out.setVersion(QDataStream::Qt_5_6);
 #endif
@@ -148,7 +152,7 @@ namespace MetadataIO {
 
     QDataStream &operator>>(QDataStream &in, CachedArtwork &v) {
         // TODO: update before release to Qt 5.9
-        Q_ASSERT(!XPIKS_VERSION_CHECK(1, 5, 0));
+        Q_ASSERT(!XPIKS_VERSION_CHECK(1, 6, 0));
 #ifndef TRAVIS_CI
         in.setVersion(QDataStream::Qt_5_6);
 #endif

@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,30 +9,49 @@
  */
 
 #include "uiprovider.h"
-#include <QQmlComponent>
-#include <QQmlError>
-#include <QQuickItem>
-#include <QQmlEngine>
-#include <QQuickView>
-#include <QQmlProperty>
-#include <QQmlContext>
-#include <QQuickWindow>
+
+#include <cstddef>
+
 #include <QHash>
-#include "../Common/defines.h"
+#include <QHashIterator>
+#include <QMetaObject>
+#include <QQmlComponent>
+#include <QQmlContext>
+#include <QQmlEngine>
+#include <QQmlError>
+#include <QQmlProperty>
+#include <QQuickItem>
+#include <QReturnArgument>
+#include <QUrl>
+#include <QVariant>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Common/logging.h"
 
 namespace Plugins {
-    UIProvider::UIProvider(QObject *parent):
+    UIProvider::UIProvider(Models::UIManager &uiManager, QObject *parent):
         QObject(parent),
         m_QmlEngine(NULL),
         m_Root(NULL),
-        m_UiManager(NULL)
+        m_UiManager(uiManager)
     {
     }
 
-    UIProvider::~UIProvider() {
+    void UIProvider::closeAllDialogs() {
+        LOG_DEBUG << "#";
+        LOG_DEBUG << m_OpenedDialogs.size() << "possibly opened dialogs";
+
+        for (QObject *object: m_OpenedDialogs) {
+            QVariant returnedValue;
+            bool result = QMetaObject::invokeMethod(object, "closePopup", Q_RETURN_ARG(QVariant, returnedValue));
+            if (!result) {
+                LOG_WARNING << "Failed to call closePopup() for object";
+            }
+        }
     }
 
-    void UIProvider::openDialog(const QUrl &rcPath, const QHash<QString, QObject *> &contextModels) const {
+    void UIProvider::openDialog(const QUrl &rcPath, const QHash<QString, QObject *> &contextModels) {
         QQmlComponent component(m_QmlEngine);
 
         QObject::connect(&component, &QQmlComponent::statusChanged,
@@ -72,6 +91,8 @@ namespace Plugins {
             if (!result) {
                 LOG_WARNING << "Failed to call onAfterCreated() for" << rcPath;
             }
+
+            m_OpenedDialogs.append(object);
         } else {
             LOG_WARNING << "Failed to create object";
         }
@@ -91,11 +112,13 @@ namespace Plugins {
         Q_UNUSED(object);
         LOG_DEBUG << "Component destroyed";
         m_QmlEngine->collectGarbage();
+        m_OpenedDialogs.removeOne(object);
     }
 
     void UIProvider::contextDestroyed(QObject *object) {
         Q_UNUSED(object);
         LOG_DEBUG << "#";
         m_QmlEngine->collectGarbage();
+        m_OpenedDialogs.removeOne(object);
     }
 }

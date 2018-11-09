@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,18 +11,21 @@
 #ifndef STRINGHELPER
 #define STRINGHELPER
 
+#include <functional>
 #include <string>
 #include <vector>
+
+#include <QByteArray>
+#include <QChar>
 #include <QString>
 #include <QVector>
-#include <stdarg.h>
-#include <functional>
+#include <Qt>
+#include <QtGlobal>
 
-class QString;
 class QStringList;
-class QByteArray;
 
 namespace Helpers {
+    QString stringPercentDecode(const QString &from);
     void foreachPart(const QString &text,
                      const std::function<bool (const QChar &symbol)> &isSeparatorPred,
                      const std::function<bool (const QString &word)> &pred,

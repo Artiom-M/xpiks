@@ -6,8 +6,8 @@
 class SaveVideoBasicTest : public IntegrationTestBase
 {
 public:
-    SaveVideoBasicTest(Commands::CommandManager *commandManager):
-        IntegrationTestBase(commandManager)
+    SaveVideoBasicTest(IntegrationTestsEnvironment &environment, XpiksTestsApp &testsApp):
+        IntegrationTestBase(environment, testsApp)
     {}
 
     // IntegrationTestBase interface

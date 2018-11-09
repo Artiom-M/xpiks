@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,11 +11,15 @@
 #ifndef UIPROVIDER_H
 #define UIPROVIDER_H
 
-#include <QQuickItem>
-#include <QQmlComponent>
-#include <QQuickWindow>
+#include <QHash>
 #include <QObject>
-#include <QUrl>
+#include <QQmlComponent>
+#include <QString>
+#include <QVector>
+
+class QQmlEngine;
+class QQuickItem;
+class QUrl;
 
 namespace Models {
     class UIManager;
@@ -26,20 +30,21 @@ namespace Plugins {
     {
         Q_OBJECT
     public:
-        UIProvider(QObject *parent=0);
-        virtual ~UIProvider();
+        UIProvider(Models::UIManager &uiManager, QObject *parent=0);
 
     public:
-        Models::UIManager *getUIManager() const { return m_UiManager; }
+        Models::UIManager &getUIManager() const { return m_UiManager; }
 
     public:
         void setQmlEngine(QQmlEngine *engine) { m_QmlEngine = engine; }
         void setRoot(QQuickItem *root) { m_Root = root; }
-        void setUIManager(Models::UIManager *manager) { m_UiManager = manager; }
+
+    public:
+        void closeAllDialogs();
 
         // IUIProvider interface
     public:
-        void openDialog(const QUrl &rcPath, const QHash<QString, QObject*> &contextModels = QHash<QString, QObject*>()) const;
+        void openDialog(const QUrl &rcPath, const QHash<QString, QObject*> &contextModels = QHash<QString, QObject*>());
 
     private slots:
         void viewStatusChanged(QQmlComponent::Status status);
@@ -49,7 +54,8 @@ namespace Plugins {
     private:
         QQmlEngine *m_QmlEngine;
         QQuickItem *m_Root;
-        Models::UIManager *m_UiManager;
+        QVector<QObject*> m_OpenedDialogs;
+        Models::UIManager &m_UiManager;
     };
 }
 

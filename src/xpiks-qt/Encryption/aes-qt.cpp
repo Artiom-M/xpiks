@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,11 +9,16 @@
  */
 
 #include "aes-qt.h"
-#include <QString>
-#include <QDataStream>
+
+#include <cstdint>
+
+#include <QByteArray>
+#include <QChar>
 #include <QCryptographicHash>
-#include <cstdio>
-#include <aes.h>
+#include <QString>
+#include <QtGlobal>
+
+#include <vendors/tiny-aes/aes.h>
 
 #define MAX_ENCRYPTION_LENGTH 2048
 
@@ -45,7 +50,7 @@ namespace Encryption {
         QByteArray encodingBuffer(encryptionLength, 0);
         inputData.resize(encryptionLength);
 
-        AES128_CBC_encrypt_buffer((uint8_t*)encodingBuffer.data(), (uint8_t*)inputData.data(), encryptionLength, (const uint8_t*)keyData.data(), iv);
+        AES_CBC_encrypt_buffer((uint8_t*)encodingBuffer.data(), (uint8_t*)inputData.data(), encryptionLength, (const uint8_t*)keyData.data(), iv);
 
         QByteArray data(encodingBuffer.data(), encryptionLength);
         QString hex = QString::fromLatin1(data.toHex());
@@ -66,7 +71,7 @@ namespace Encryption {
         Q_ASSERT(encodedText.length() <= encryptionLength);
         encodedText.resize(encryptionLength);
 
-        AES128_CBC_decrypt_buffer((uint8_t*)encodingBuffer.data(), (uint8_t*)encodedText.data(), encryptionLength, (const uint8_t*)keyData.data(), iv);
+        AES_CBC_decrypt_buffer((uint8_t*)encodingBuffer.data(), (uint8_t*)encodedText.data(), encryptionLength, (const uint8_t*)keyData.data(), iv);
 
         encodingBuffer.append("\0\0");
         void *data = encodingBuffer.data();
@@ -75,6 +80,3 @@ namespace Encryption {
         return result;
     }
 }
-
-
-

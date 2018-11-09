@@ -6,8 +6,8 @@
 class UndoRestoreSessionTest: public IntegrationTestBase
 {
 public:
-    UndoRestoreSessionTest(Commands::CommandManager *commandManager):
-        IntegrationTestBase(commandManager)
+    UndoRestoreSessionTest(IntegrationTestsEnvironment &environment, XpiksTestsApp &testsApp):
+        IntegrationTestBase(environment, testsApp)
     {}
 
     // IntegrationTestBase interface

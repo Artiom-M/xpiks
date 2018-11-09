@@ -1,16 +1,8 @@
 #include "unicodeiotest.h"
 #include <QUrl>
-#include <QFileInfo>
-#include <QStringList>
-#include "integrationtestbase.h"
+#include <QList>
 #include "signalwaiter.h"
-#include "../../xpiks-qt/Commands/commandmanager.h"
-#include "../../xpiks-qt/Models/artitemsmodel.h"
-#include "../../xpiks-qt/MetadataIO/metadataiocoordinator.h"
-#include "../../xpiks-qt/Models/artworkmetadata.h"
-#include "../../xpiks-qt/Models/settingsmodel.h"
-#include "../../xpiks-qt/Models/filteredartitemsproxymodel.h"
-#include "../../xpiks-qt/Models/imageartwork.h"
+#include "xpikstestsapp.h"
 #include "exiv2iohelpers.h"
 
 QString UnicodeIoTest::testName() {
@@ -22,26 +14,12 @@ void UnicodeIoTest::setup() {
 
 int UnicodeIoTest::doTest() {
     // reading part ---------------------------------
-
-    Models::ArtItemsModel *artItemsModel = m_CommandManager->getArtItemsModel();
     QList<QUrl> files;
-    files << getFilePathForTest("images-for-tests/utf8-meta/Eiffel_Wikimedia_Commons.jpg");
+    files << setupFilePathForTest("images-for-tests/utf8-meta/Eiffel_Wikimedia_Commons.jpg");
 
-    MetadataIO::MetadataIOCoordinator *ioCoordinator = m_CommandManager->getMetadataIOCoordinator();
-    SignalWaiter waiter;
-    QObject::connect(ioCoordinator, SIGNAL(metadataReadingFinished()), &waiter, SIGNAL(finished()));
+    VERIFY(m_TestsApp.addFilesForTest(files), "Failed to add files");
 
-    int addedCount = artItemsModel->addLocalArtworks(files);
-    VERIFY(addedCount == files.length(), "Failed to add file");
-    ioCoordinator->continueReading(true);
-
-    if (!waiter.wait(20)) {
-        VERIFY(false, "Timeout exceeded for reading metadata.");
-    }
-
-    VERIFY(!ioCoordinator->getHasErrors(), "Errors in IO Coordinator while reading");
-
-    Models::ArtworkMetadata *artwork = artItemsModel->getArtwork(0);
+    auto artwork = m_TestsApp.getArtwork(0);
 
     BasicMetadata basicMetadata;
     ::readMetadata(artwork->getFilepath(), basicMetadata);
@@ -53,19 +31,11 @@ int UnicodeIoTest::doTest() {
     // writing part ---------------------------------
 
     files.clear();
-    files << getFilePathForTest("images-for-tests/utf8-meta/Maurice_koechlin_pylone.jpg");
+    files << setupFilePathForTest("images-for-tests/utf8-meta/Maurice_koechlin_pylone.jpg");
 
-    addedCount = artItemsModel->addLocalArtworks(files);
-    VERIFY(addedCount == files.length(), "Failed to add file");
-    ioCoordinator->continueReading(true);
+    VERIFY(m_TestsApp.addFilesForTest(files), "Failed to add files");
 
-    if (!waiter.wait(20)) {
-        VERIFY(false, "Timeout exceeded for reading metadata.");
-    }
-
-    VERIFY(!ioCoordinator->getHasErrors(), "Errors in IO Coordinator while reading");
-
-    artwork = artItemsModel->getArtwork(1);
+    artwork = m_TestsApp.getArtwork(1);
 
     const QString titleu8 = QStringLiteral("πύργος του Άιφελ");
     const QString description8u = QStringLiteral("První plány stavby byly zahájeny už v roce 1878.");
@@ -77,16 +47,13 @@ int UnicodeIoTest::doTest() {
     artwork->setKeywords(keywordsu8);
     artwork->setIsSelected(true);
 
-    bool doOverwrite = true, dontSaveBackups = false;
+    SignalWaiter waiter;
+    m_TestsApp.connectWaiterForExport(waiter);
+    QVariantMap params{{"overwrite", QVariant(true)}, {"backup", QVariant(false)}};
+    m_TestsApp.dispatch(QMLExtensions::UICommandID::SetupExportMetadata, QVariant::fromValue(params));
 
-    QObject::connect(ioCoordinator, SIGNAL(metadataWritingFinished()), &waiter, SIGNAL(finished()));
-    artItemsModel->saveSelectedArtworks(QVector<int>() << 1, doOverwrite, dontSaveBackups);
-
-    if (!waiter.wait(20)) {
-        VERIFY(false, "Timeout exceeded for writing metadata.");
-    }
-
-    VERIFY(!ioCoordinator->getHasErrors(), "Errors in IO Coordinator while writing");
+    VERIFY(waiter.wait(20), "Timeout exceeded for writing metadata.");
+    VERIFY(m_TestsApp.checkExportSucceeded(), "Failed to export artworks");
 
     BasicMetadata exifMetadata, iptcMetadata, xmpMetadata;
     ::readMetadataEx(artwork->getFilepath(), xmpMetadata, exifMetadata, iptcMetadata);

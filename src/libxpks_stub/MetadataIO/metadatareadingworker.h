@@ -11,20 +11,15 @@
 #ifndef METADATAREADINGWORKER_H
 #define METADATAREADINGWORKER_H
 
-#include <QObject>
-#include <QVector>
-#include <QHash>
-#include <QString>
-#include <QProcess>
-#include <QStringList>
 #include <QByteArray>
-#include <QHash>
-#include <QSize>
-#include <MetadataIO/originalmetadata.h>
-#include <MetadataIO/artworkssnapshot.h>
+#include <QObject>
+#include <QProcess>
+#include <QString>
+#include <QStringList>
+
+#include "Artworks/artworkssnapshot.h"
 
 namespace Models {
-    class ArtworkMetadata;
     class SettingsModel;
 }
 
@@ -38,9 +33,9 @@ namespace libxpks {
         {
             Q_OBJECT
         public:
-            explicit ExiftoolImageReadingWorker(const MetadataIO::ArtworksSnapshot &artworksToRead,
-                                                Models::SettingsModel *settingsModel,
-                                                MetadataIO::MetadataReadingHub *readingHub);
+            explicit ExiftoolImageReadingWorker(Artworks::ArtworksSnapshot const &artworksToRead,
+                                                Models::SettingsModel &settingsModel,
+                                                MetadataIO::MetadataReadingHub &readingHub);
             virtual ~ExiftoolImageReadingWorker();
 
         signals:
@@ -63,10 +58,10 @@ namespace libxpks {
             void readSizes();
 
         private:
-            MetadataIO::ArtworksSnapshot m_ItemsToReadSnapshot;
-            MetadataIO::MetadataReadingHub *m_ReadingHub;
+            Artworks::ArtworksSnapshot const &m_ItemsToReadSnapshot;
+            MetadataIO::MetadataReadingHub &m_ReadingHub;
             QProcess *m_ExiftoolProcess;
-            Models::SettingsModel *m_SettingsModel;
+            Models::SettingsModel &m_SettingsModel;
             volatile bool m_ReadSuccess;
         };
     }

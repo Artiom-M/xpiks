@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,29 +11,48 @@
 #ifndef METADATACACHE_H
 #define METADATACACHE_H
 
-#include <QMutex>
-#include <QReadWriteLock>
-#include "../Helpers/database.h"
-#include "cachedartwork.h"
-#include "../Suggestion/searchquery.h"
+#include <memory>
 
-namespace Models {
+#include <QMutex>
+#include <QByteArray>
+#include <QString>
+#include <QVector>
+#include <QtGlobal>
+
+#include "Storage/idatabase.h"
+#include "Storage/writeaheadlog.h"
+
+template <class T1, class T2> struct QPair;
+
+namespace Artworks {
     class ArtworkMetadata;
 }
 
+namespace Microstocks {
+    class SearchQuery;
+}
+
+namespace Storage {
+    class IDatabaseManager;
+}
+
 namespace MetadataIO {
-    class ArtworkSetWAL: public Helpers::WriteAheadLog<QString, CachedArtwork> {
+    struct CachedArtwork;
+
+    class ArtworkSetWAL: public Storage::WriteAheadLog<QString, CachedArtwork> {
     protected:
         virtual QByteArray keyToByteArray(const QString &key) const override { return key.toUtf8(); }
-        virtual bool doFlush(std::shared_ptr<Helpers::Database::Table> &dbTable, const QVector<QPair<QByteArray, QByteArray> > &keyValuesList, QVector<int> &failedIndices) override {
+        virtual QString keyFromByteArray(const QByteArray &rawKey) const override { return QString::fromUtf8(rawKey); }
+        virtual bool doFlush(std::shared_ptr<Storage::IDbTable> &dbTable, const QVector<QPair<QByteArray, QByteArray> > &keyValuesList, QVector<int> &failedIndices) override {
             return dbTable->trySetMany(keyValuesList, failedIndices);
         }
     };
 
-    class ArtworkAddWAL: public Helpers::WriteAheadLog<QString, CachedArtwork> {
+    class ArtworkAddWAL: public Storage::WriteAheadLog<QString, CachedArtwork> {
     protected:
         virtual QByteArray keyToByteArray(const QString &key) const override { return key.toUtf8(); }
-        virtual bool doFlush(std::shared_ptr<Helpers::Database::Table> &dbTable, const QVector<QPair<QByteArray, QByteArray> > &keyValuesList, QVector<int> &failedIndices) override {
+        virtual QString keyFromByteArray(const QByteArray &rawKey) const override { return QString::fromUtf8(rawKey); }
+        virtual bool doFlush(std::shared_ptr<Storage::IDbTable> &dbTable, const QVector<QPair<QByteArray, QByteArray> > &keyValuesList, QVector<int> &failedIndices) override {
             Q_UNUSED(failedIndices);
             int count = dbTable->tryAddMany(keyValuesList);
             return count > 0;
@@ -43,7 +62,7 @@ namespace MetadataIO {
     class MetadataCache
     {
     public:
-        MetadataCache(Helpers::DatabaseManager *dbManager);
+        MetadataCache(Storage::IDatabaseManager &dbManager);
 
     public:
         bool initialize();
@@ -58,20 +77,20 @@ namespace MetadataIO {
 #endif
 
     public:
-        bool read(Models::ArtworkMetadata *metadata);
-        void save(Models::ArtworkMetadata *metadata, bool overwrite = true);
+        bool read(std::shared_ptr<Artworks::ArtworkMetadata> const &artwork, CachedArtwork &cachedArtwork);
+        void save(std::shared_ptr<Artworks::ArtworkMetadata> const &artwork, bool overwrite = true);
 
     public:
-        void search(const Suggestion::SearchQuery &query, QVector<CachedArtwork> &results);
+        void search(const Microstocks::SearchQuery &query, QVector<CachedArtwork> &results);
 
     private:
         void flushWAL();
 
     private:
         QMutex m_ReadMutex;
-        Helpers::DatabaseManager *m_DatabaseManager;
-        std::shared_ptr<Helpers::Database::Table> m_DbCacheIndex;
-        std::shared_ptr<Helpers::Database> m_Database;
+        Storage::IDatabaseManager &m_DatabaseManager;
+        std::shared_ptr<Storage::IDbTable> m_DbCacheIndex;
+        std::shared_ptr<Storage::IDatabase> m_Database;
         ArtworkSetWAL m_SetWAL;
         ArtworkAddWAL m_AddWal;
     };

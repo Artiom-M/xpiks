@@ -1,8 +1,11 @@
 #ifndef BASICKEYWORDSMODELTESTS_H
 #define BASICKEYWORDSMODELTESTS_H
 
-#include <QtTest/QtTest>
-#include "../../xpiks-qt/Common/hold.h"
+#include <QObject>
+#include <QtTest>  // IWYU pragma: keep
+// IWYU pragma: no_include <QString>
+
+#include "Services/SpellCheck/spellcheckinfo.h"
 
 class BasicKeywordsModelTests: public QObject
 {
@@ -18,6 +21,7 @@ private slots:
     void appendSameKeywordsTest();
     void appendSameChangedKeywordTest();
     void appendNoKeywordsTest();
+    void expandPresetTest();
     void clearKeywordsTest();
     void clearModelTest();
     void containsKeywordTest();
@@ -45,7 +49,7 @@ private slots:
     void removeKeywordsCaseSensitiveTest();
 
 private:
-    Common::Hold m_FakeHold;
+    SpellCheck::SpellCheckInfo m_SpellCheckInfo;
 };
 
 #endif // BASICKEYWORDSMODELTESTS_H

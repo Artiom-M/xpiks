@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,12 +9,22 @@
  */
 
 #include "updatehelpers.h"
+
+#include <QtGlobal>
+
+#ifdef Q_OS_OSX
 #include <QProcess>
 #include <QStringList>
-#include <QDir>
-#include <QCoreApplication>
+#endif
+
+#ifdef Q_OS_WIN
+#include <QDateTime>
 #include <QFileInfo>
-#include "../Common/defines.h"
+#include <QProcess>
+
+#include "Common/isystemenvironment.h"
+#include "Common/logging.h"
+#endif
 
 #ifdef Q_OS_OSX
 
@@ -30,40 +40,27 @@ void launchOSXdmg(const QString &dmgPath) {
 #ifdef Q_OS_WIN
 
 QString getLogFilenameForMinistaller() {
-    QString appDataPath = XPIKS_USERDATA_PATH;
-    if (appDataPath.isEmpty()) {
-        appDataPath = QDir::currentPath();
-    }
-
-    const QString &logFileDir = QDir::cleanPath(appDataPath + QDir::separator() + "logs");
-    QDir logsDir(logFileDir);
-    Q_ASSERT(logsDir.exists());
-
     QString time = QDateTime::currentDateTimeUtc().toString("ddMMyyyy-hhmmss-zzz");
     QString logFilename = QString("ministaller-%1.log").arg(time);
-
-    QString logFilePath = logsDir.filePath(logFilename);
-    return logFilePath;
+    return logFilename;
 }
 
-void launchWindowsInstaller(const QString &pathToUpdate) {
+void launchWindowsInstaller(Common::ISystemEnvironment &environment, const QString &pathToUpdate) {
     LOG_DEBUG << "#";
-
-    const QString appDirPath = QCoreApplication::applicationDirPath();
-    QDir appDir(appDirPath);
-    QString ministallerPath = appDir.filePath("ministaller.exe");
+    QString ministallerPath = environment.path({"ministaller.exe"});
 
     if (!QFileInfo(ministallerPath).exists()) {
         LOG_WARNING << "Updater not found!" << ministallerPath;
         return;
     }
 
-    QString installerLogPath = getLogFilenameForMinistaller();
+    QString installerLogName = getLogFilenameForMinistaller();
+    QString installerLogPath = environment.path({"logs", installerLogName});
     QStringList arguments;
     arguments << "-force-update" << "-gui" <<
-                 "-install-path" << appDirPath <<
+                 "-install-path" << environment.root() <<
                  "-l" << installerLogPath <<
-                 "-launch-exe" << "xpiks-qt.exe" <<
+                 "-launch-exe" << "Xpiks.exe" <<
                  "-package-path" << pathToUpdate <<
                  "-stdout";
 
@@ -73,11 +70,12 @@ void launchWindowsInstaller(const QString &pathToUpdate) {
 #endif
 
 namespace Helpers {
-    void installUpdate(const QString &updatePath) {
+    void installUpdate(Common::ISystemEnvironment &environment, const QString &updatePath) {
+        Q_UNUSED(environment);
 #if defined(Q_OS_OSX)
         launchOSXdmg(updatePath);
 #elif defined(Q_OS_WIN)
-        launchWindowsInstaller(updatePath);
+        launchWindowsInstaller(environment, updatePath);
 #endif
     }
 }

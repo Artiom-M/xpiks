@@ -6,8 +6,8 @@
 class AutoCompleteBasicTest : public IntegrationTestBase
 {
 public:
-    AutoCompleteBasicTest(Commands::CommandManager *commandManager):
-        IntegrationTestBase(commandManager)
+    AutoCompleteBasicTest(IntegrationTestsEnvironment &environment, XpiksTestsApp &testsApp):
+        IntegrationTestBase(environment, testsApp)
     {}
 
     // IntegrationTestBase interface

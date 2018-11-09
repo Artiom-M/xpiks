@@ -8,10 +8,10 @@
 #include <sstream>
 #include <string>
 
-#include "../../xpiks-qt/Models/artworkmetadata.h"
-#include "../../xpiks-qt/Models/imageartwork.h"
-#include "../../xpiks-qt/Common/defines.h"
-#include "../../xpiks-qt/Helpers/stringhelper.h"
+#include <Artworks/artworkmetadata.h>
+#include <Artworks/imageartwork.h>
+#include <Common/defines.h>
+#include <Helpers/stringhelper.h>
 
 #ifdef Q_OS_WIN
 #include <Windows.h>
@@ -51,7 +51,7 @@ Exiv2InitHelper::~Exiv2InitHelper() {
 // helper from libkexiv2
 bool isUtf8(const char * const buffer) {
     int i, n;
-    register unsigned char c;
+    unsigned char c;
     bool gotone = false;
 
     if (!buffer) {

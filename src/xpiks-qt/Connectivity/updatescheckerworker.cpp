@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -17,24 +17,33 @@
 #define UPDATE_JSON_UPDATE_URL "update_link"
 #define UPDATE_JSON_CHECKSUM "checksum"
 
-#include <QString>
-#include <QUrl>
+#include <QByteArray>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
-#include <QThread>
+#include <QFileInfo>
+#include <QIODevice>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
+#include <QLatin1Char>
+#include <QString>
+#include <QtDebug>
 #include <QtGlobal>
-#include <QCryptographicHash>
-#include "simplecurlrequest.h"
-#include "simplecurldownloader.h"
-#include "apimanager.h"
-#include "../Common/defines.h"
-#include "../Common/version.h"
-#include "../Common/defines.h"
-#include "../Models/settingsmodel.h"
-#include "../Models/proxysettings.h"
-#include "../Helpers/constants.h"
+
+#include "Common/isystemenvironment.h"
+#include "Common/logging.h"
+#include "Common/version.h"
+#include "Connectivity/apimanager.h"
+#include "Connectivity/simplecurldownloader.h"
+#include "Connectivity/simplecurlrequest.h"
+#include "Helpers/constants.h"
+#include "Models/settingsmodel.h"
+#include "Services/Maintenance/maintenanceservice.h"
+
+namespace Models {
+    class ProxySettings;
+}
 
 QString fileChecksum(const QString &fileName, QCryptographicHash::Algorithm hashAlgorithm) {
     QString result;
@@ -84,33 +93,24 @@ QString urlFilename(const QString &url) {
 }
 
 namespace Connectivity {
-    UpdatesCheckerWorker::UpdatesCheckerWorker(Models::SettingsModel *settingsModel, const QString &availableUpdatePath):
+    UpdatesCheckerWorker::UpdatesCheckerWorker(Common::ISystemEnvironment &environment,
+                                               Models::SettingsModel &settingsModel,
+                                               Maintenance::MaintenanceService &maintenanceService,
+                                               const QString &availableUpdatePath):
+        m_Environment(environment),
         m_SettingsModel(settingsModel),
+        m_MaintenanceService(maintenanceService),
         m_AvailableUpdatePath(availableUpdatePath)
     {
-        Q_ASSERT(settingsModel != nullptr);
-    }
-
-    UpdatesCheckerWorker::~UpdatesCheckerWorker() {
     }
 
     void UpdatesCheckerWorker::initWorker() {
-        QString appDataPath = XPIKS_USERDATA_PATH;
-        if (!appDataPath.isEmpty()) {
-            QDir appDir(appDataPath);
-            if (appDir.mkdir(QLatin1String(Constants::UPDATES_DIRECTORY))) {
-                LOG_INFO << "Created updates directory";
-            }
-
-            m_UpdatesDirectory = QDir::cleanPath(appDataPath + QDir::separator() + Constants::UPDATES_DIRECTORY);
-        } else {
-            LOG_WARNING << "Can't get to the updates directory. Using temporary...";
-            m_UpdatesDirectory = QDir::temp().absolutePath();
-        }
+        m_Environment.ensureDirExists(Constants::UPDATES_DIRECTORY);
+        m_UpdatesDirectory = m_Environment.path({Constants::UPDATES_DIRECTORY});
     }
 
     void UpdatesCheckerWorker::processOneItem() {
-        LOG_INFO << "Update service: checking for updates...";
+        LOG_INFO << "Checking for updates...";
 
         UpdateCheckResult updateCheckResult;
         if (checkForUpdates(updateCheckResult)) {
@@ -118,7 +118,7 @@ namespace Connectivity {
             if (checkAvailableUpdate(updateCheckResult)) {
                 LOG_INFO << "Update is already downloaded:" << m_AvailableUpdatePath;
                 emit updateDownloaded(m_AvailableUpdatePath, updateCheckResult.m_Version);
-            } else if (m_SettingsModel->getAutoDownloadUpdates()) {
+            } else if (m_SettingsModel.getAutoDownloadUpdates() && !m_Environment.getIsInMemoryOnly()) {
                 LOG_DEBUG << "Going to download update...";
                 QString pathToUpdate;
                 if (downloadUpdate(updateCheckResult, pathToUpdate)) {
@@ -131,6 +131,8 @@ namespace Connectivity {
             {
                 emit updateAvailable(updateCheckResult.m_UpdateURL);
             }
+        } else {
+            m_MaintenanceService.cleanupDownloadedUpdates(m_UpdatesDirectory);
         }
 
         emit stopped();
@@ -144,7 +146,7 @@ namespace Connectivity {
         auto &apiManager = ApiManager::getInstance();
         QString queryString = apiManager.getUpdateAddr();
 
-        Models::ProxySettings *proxySettings = m_SettingsModel->retrieveProxySettings();
+        Models::ProxySettings *proxySettings = m_SettingsModel.retrieveProxySettings();
 
         Connectivity::SimpleCurlRequest request(queryString);
         request.setProxySettings(proxySettings);
@@ -193,13 +195,14 @@ namespace Connectivity {
 
     bool UpdatesCheckerWorker::downloadUpdate(const UpdateCheckResult &updateCheckResult, QString &pathToUpdate) {
         LOG_DEBUG << "#";
+        Q_ASSERT(!m_Environment.getIsInMemoryOnly());
         bool success = false;
 
         Connectivity::SimpleCurlDownloader downloader(updateCheckResult.m_UpdateURL);
         QObject::connect(this, &UpdatesCheckerWorker::cancelRequested,
                          &downloader, &Connectivity::SimpleCurlDownloader::cancelRequested);
 
-        Models::ProxySettings *proxySettings = m_SettingsModel->retrieveProxySettings();
+        Models::ProxySettings *proxySettings = m_SettingsModel.retrieveProxySettings();
         downloader.setProxySettings(proxySettings);
 
         if (downloader.downloadFileSync()) {
@@ -213,7 +216,6 @@ namespace Connectivity {
                 QDir updatesDir(m_UpdatesDirectory);
                 Q_ASSERT(updatesDir.exists());
 
-                QString filename = QFileInfo(downloadedPath).fileName();
                 QString realFilename = urlFilename(updateCheckResult.m_UpdateURL);
                 QString updatePath = updatesDir.filePath(realFilename);
 

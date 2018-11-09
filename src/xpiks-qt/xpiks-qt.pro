@@ -1,175 +1,228 @@
 TEMPLATE = app
 
-QMAKE_MAC_SDK = macosx10.11
+macx { QMAKE_MAC_SDK = macosx }
 
 QT += qml quick widgets concurrent svg
 CONFIG += qtquickcompiler
-CONFIG += c++11
+CONFIG += c++14
+TARGET = Xpiks
 
-VERSION = 1.5.2.1
+!win32 {
+    QMAKE_CXXFLAGS += -std=c++14
+}
+#CONFIG += force_debug_info
+
+CONFIG(release, debug|release)  {
+    CONFIG += separate_debug_info
+}
+
+VERSION = 1.5.2.2
 QMAKE_TARGET_PRODUCT = Xpiks
 QMAKE_TARGET_DESCRIPTION = "Cross-Platform Image Keywording Software"
-QMAKE_TARGET_COPYRIGHT = "Copyright (C) 2014-2017 Taras Kushnir"
+QMAKE_TARGET_COPYRIGHT = "Copyright (C) 2014-2018 Taras Kushnir"
 
 SOURCES += main.cpp \
-    Models/artitemsmodel.cpp \
-    Models/artworkmetadata.cpp \
-    Helpers/globalimageprovider.cpp \
-    Models/artworksrepository.cpp \
-    Models/combinedartworksmodel.cpp \
-    Helpers/indiceshelper.cpp \
-    Models/artworkuploader.cpp \
-    Models/uploadinforepository.cpp \
-    ../../vendors/tiny-aes/aes.cpp \
     ../../vendors/sqlite/sqlite3.c \
-    Encryption/secretsmanager.cpp \
-    Helpers/stringhelper.cpp \
+    ../../vendors/tiny-aes/aes.cpp \
+    Artworks/artworkmetadata.cpp \
+    Artworks/artworkssnapshot.cpp \
+    Artworks/basickeywordsmodel.cpp \
+    Artworks/basickeywordsmodelimpl.cpp \
+    Artworks/basicmetadatamodel.cpp \
+    Artworks/imageartwork.cpp \
+    Artworks/videoartwork.cpp \
+    Commands/artworksupdatetemplate.cpp \
+    Commands/Base/actionmodelcommand.cpp \
+    Commands/Base/compositecommand.cpp \
     Commands/commandmanager.cpp \
-    UndoRedo/undoredomanager.cpp \
-    Commands/addartworkscommand.cpp \
-    UndoRedo/addartworksitem.cpp \
-    Commands/removeartworkscommand.cpp \
-    UndoRedo/removeartworksitem.cpp \
-    UndoRedo/artworkmetadatabackup.cpp \
-    UndoRedo/modifyartworkshistoryitem.cpp \
-    Commands/combinededitcommand.cpp \
-    Commands/pastekeywordscommand.cpp \
-    Helpers/runguard.cpp \
-    Encryption/aes-qt.cpp \
-    Models/ziparchiver.cpp \
-    Helpers/ziphelper.cpp \
-    Suggestion/keywordssuggestor.cpp \
-    Models/settingsmodel.cpp \
-    Helpers/loggingworker.cpp \
-    Helpers/logger.cpp \
-    Models/logsmodel.cpp \
-    Models/filteredartitemsproxymodel.cpp \
-    Helpers/helpersqmlwrapper.cpp \
-    Models/recentdirectoriesmodel.cpp \
-    Connectivity/updateservice.cpp \
-    SpellCheck/spellcheckerservice.cpp \
-    SpellCheck/spellcheckitem.cpp \
-    SpellCheck/spellcheckworker.cpp \
-    SpellCheck/spellchecksuggestionmodel.cpp \
-    Common/basickeywordsmodel.cpp \
-    SpellCheck/spellcheckerrorshighlighter.cpp \
-    SpellCheck/spellcheckiteminfo.cpp \
-    SpellCheck/spellsuggestionsitem.cpp \
-    Connectivity/updatescheckerworker.cpp \
-    Warnings/warningscheckingworker.cpp \
-    MetadataIO/metadataiocoordinator.cpp \
-    Connectivity/testconnection.cpp \
-    Connectivity/ftphelpers.cpp \
-    Plugins/pluginmanager.cpp \
-    Plugins/pluginwrapper.cpp \
-    Plugins/pluginactionsmodel.cpp \
-    Plugins/uiprovider.cpp \
-    Warnings/warningsservice.cpp \
-    Helpers/loghighlighter.cpp \
-    Warnings/warningsmodel.cpp \
-    Models/languagesmodel.cpp \
-    Helpers/filterhelpers.cpp \
-    QMLExtensions/triangleelement.cpp \
-    Suggestion/shutterstockqueryengine.cpp \
-    Suggestion/locallibraryqueryengine.cpp \
-    Suggestion/fotoliaqueryengine.cpp \
-    QMLExtensions/colorsmodel.cpp \
-    Helpers/remoteconfig.cpp \
-    Helpers/localconfig.cpp \
-    Helpers/jsonhelper.cpp \
-    AutoComplete/autocompleteworker.cpp \
-    AutoComplete/autocompleteservice.cpp \
-    Suggestion/gettyqueryengine.cpp \
-    Models/abstractconfigupdatermodel.cpp \
-    AutoComplete/stocksftplistmodel.cpp \
-    Models/imageartwork.cpp \
-    Common/flags.cpp \
-    Models/proxysettings.cpp \
-    QMLExtensions/imagecachingworker.cpp \
-    QMLExtensions/imagecachingservice.cpp \
-    QMLExtensions/cachingimageprovider.cpp \
-    Commands/findandreplacecommand.cpp \
-    Helpers/metadatahighlighter.cpp \
-    Models/findandreplacemodel.cpp \
-    Commands/deletekeywordscommand.cpp \
-    Models/deletekeywordsviewmodel.cpp \
-    Models/artworksviewmodel.cpp \
-    Helpers/keywordshelpers.cpp \
-    Connectivity/uploadwatcher.cpp \
-    Warnings/warningssettingsmodel.cpp \
-    Connectivity/simplecurlrequest.cpp \
+    Commands/Editing/clearactionmodeltemplate.cpp \
+    Commands/Editing/deletekeywordstemplate.cpp \
+    Commands/Editing/editartworkstemplate.cpp \
+    Commands/Editing/expandpresettemplate.cpp \
+    Commands/Editing/findandreplacetemplate.cpp \
+    Commands/Editing/keywordedittemplate.cpp \
+    Commands/Editing/readmetadatatemplate.cpp \
+    Commands/Files/addfilescommand.cpp \
+    Commands/Files/addtorecenttemplate.cpp \
+    Commands/Files/removedirectorycommand.cpp \
+    Commands/Files/removefilescommand.cpp \
+    Commands/Files/removefilescommandbase.cpp \
+    Commands/Files/removeselectedfilescommand.cpp \
+    Commands/Services/autoimportmetadatacommand.cpp \
+    Commands/Services/cleanuplegacybackupscommand.cpp \
+    Commands/Services/generatethumbnailstemplate.cpp \
+    Commands/Services/savebackupstemplate.cpp \
+    Commands/Services/savesessioncommand.cpp \
+    Commands/UI/currenteditablecommands.cpp \
+    Commands/UI/generalcommands.cpp \
+    Commands/UI/selectedartworkscommands.cpp \
+    Commands/UI/singleeditablecommands.cpp \
+    Common/logging.cpp \
+    Common/statefulentity.cpp \
+    Common/systemenvironment.cpp \
+    Connectivity/configrequest.cpp \
     Connectivity/curlinithelper.cpp \
+    Connectivity/ftphelpers.cpp \
+    Connectivity/requestsservice.cpp \
+    Connectivity/requestsworker.cpp \
     Connectivity/simplecurldownloader.cpp \
+    Connectivity/simplecurlrequest.cpp \
+    Connectivity/switcherconfig.cpp \
+    Connectivity/telemetryservice.cpp \
+    Connectivity/telemetryworker.cpp \
+    Connectivity/testconnection.cpp \
+    Connectivity/updatescheckerworker.cpp \
+    Connectivity/updateservice.cpp \
+    Connectivity/uploadwatcher.cpp \
+    Encryption/aes-qt.cpp \
+    Encryption/obfuscation.cpp \
+    Encryption/secretsmanager.cpp \
+    Filesystem/directoriescollection.cpp \
+    Filesystem/filescollection.cpp \
+    Filesystem/filesdirectoriescollection.cpp \
+    Helpers/artworkshelpers.cpp \
+    Helpers/asynccoordinator.cpp \
+    Helpers/filehelpers.cpp \
+    Helpers/filterhelpers.cpp \
+    Helpers/globalimageprovider.cpp \
+    Helpers/helpersqmlwrapper.cpp \
+    Helpers/indiceshelper.cpp \
+    Helpers/indicesranges.cpp \
+    Helpers/jsonhelper.cpp \
+    Helpers/keywordshelpers.cpp \
+    Helpers/localconfig.cpp \
+    Helpers/logger.cpp \
+    Helpers/loggingworker.cpp \
+    Helpers/loghighlighter.cpp \
+    Helpers/metadatahighlighter.cpp \
+    Helpers/remoteconfig.cpp \
+    Helpers/runguard.cpp \
+    Helpers/stringhelper.cpp \
+    Helpers/threadhelpers.cpp \
+    Helpers/uihelpers.cpp \
     Helpers/updatehelpers.cpp \
-    Common/basicmetadatamodel.cpp \
+    Helpers/ziphelper.cpp \
+    KeywordsPresets/presetgroupsmodel.cpp \
     KeywordsPresets/presetkeywordsmodel.cpp \
     KeywordsPresets/presetkeywordsmodelconfig.cpp \
-    QMLExtensions/folderelement.cpp \
-    Models/artworkproxymodel.cpp \
-    Models/artworkproxybase.cpp \
-    Translation/translationservice.cpp \
-    Translation/translationmanager.cpp \
-    Translation/translationworker.cpp \
-    Translation/translationquery.cpp \
-    Models/uimanager.cpp \
-    Plugins/sandboxeddependencies.cpp \
-    Commands/expandpresetcommand.cpp \
-    QuickBuffer/currenteditableartwork.cpp \
-    QuickBuffer/currenteditableproxyartwork.cpp \
-    QuickBuffer/quickbuffer.cpp \
-    SpellCheck/userdicteditmodel.cpp \
-    Helpers/asynccoordinator.cpp \
-    QMLExtensions/tabsmodel.cpp \
-    Models/recentitemsmodel.cpp \
-    Models/recentfilesmodel.cpp \
-    Models/videoartwork.cpp \
-    Maintenance/maintenanceworker.cpp \
-    Maintenance/maintenanceservice.cpp \
-    Maintenance/logscleanupjobitem.cpp \
-    Maintenance/updatescleanupjobitem.cpp \
-    Maintenance/launchexiftooljobitem.cpp \
-    Maintenance/initializedictionariesjobitem.cpp \
-    Maintenance/movesettingsjobitem.cpp \
-    QMLExtensions/videocachingservice.cpp \
-    QMLExtensions/videocachingworker.cpp \
-    QMLExtensions/artworksupdatehub.cpp \
-    Models/keyvaluelist.cpp \
-    Helpers/filehelpers.cpp \
-    Helpers/artworkshelpers.cpp \
-    Models/sessionmanager.cpp \
-    Maintenance/savesessionjobitem.cpp \
-    Connectivity/switcherconfig.cpp \
-    Models/switchermodel.cpp \
-    Connectivity/requestsworker.cpp \
-    Connectivity/requestsservice.cpp \
-    Helpers/database.cpp \
-    Common/statefulentity.cpp \
-    QMLExtensions/cachedimage.cpp \
-    QMLExtensions/dbimagecacheindex.cpp \
-    Maintenance/moveimagecachejobitem.cpp \
-    QMLExtensions/cachedvideo.cpp \
-    QMLExtensions/dbvideocacheindex.cpp \
     MetadataIO/cachedartwork.cpp \
-    MetadataIO/metadatacache.cpp \
-    MetadataIO/metadataioworker.cpp \
-    MetadataIO/metadataioservice.cpp \
-    MetadataIO/artworkssnapshot.cpp \
-    Connectivity/connectivityrequest.cpp \
-    MetadataIO/metadatareadinghub.cpp \
-    AutoComplete/libfacecompletionengine.cpp \
-    AutoComplete/autocompletemodel.cpp \
-    AutoComplete/keywordsautocompletemodel.cpp \
-    AutoComplete/stringsautocompletemodel.cpp \
-    AutoComplete/presetscompletionengine.cpp \
-    SpellCheck/duplicatesreviewmodel.cpp \
-    SpellCheck/duplicateshighlighter.cpp \
-    MetadataIO/csvexportworker.cpp \
+    MetadataIO/csvexportmodel.cpp \
     MetadataIO/csvexportplansmodel.cpp \
     MetadataIO/csvexportproperties.cpp \
-    MetadataIO/csvexportmodel.cpp \
-    Helpers/threadhelpers.cpp \
-    KeywordsPresets/presetgroupsmodel.cpp \
-    UndoRedo/removedirectoryitem.cpp
+    MetadataIO/csvexportworker.cpp \
+    MetadataIO/metadatacache.cpp \
+    MetadataIO/metadataiocoordinator.cpp \
+    MetadataIO/metadataioservice.cpp \
+    MetadataIO/metadataioworker.cpp \
+    MetadataIO/metadatareadinghub.cpp \
+    Microstocks/fotoliaapiclient.cpp \
+    Microstocks/gettyapiclient.cpp \
+    Microstocks/microstockservice.cpp \
+    Microstocks/shutterstockapiclient.cpp \
+    Microstocks/stocksftplistmodel.cpp \
+    Models/Artworks/artworkslistmodel.cpp \
+    Models/Artworks/artworksrepository.cpp \
+    Models/Artworks/artworksviewmodel.cpp \
+    Models/Artworks/filteredartworkslistmodel.cpp \
+    Models/Connectivity/abstractconfigupdatermodel.cpp \
+    Models/Connectivity/artworksuploader.cpp \
+    Models/Connectivity/proxysettings.cpp \
+    Models/Connectivity/uploadinforepository.cpp \
+    Models/Connectivity/ziparchiver.cpp \
+    Models/Editing/artworkproxybase.cpp \
+    Models/Editing/artworkproxymodel.cpp \
+    Models/Editing/combinedartworksmodel.cpp \
+    Models/Editing/currenteditableartwork.cpp \
+    Models/Editing/currenteditablemodel.cpp \
+    Models/Editing/currenteditableproxyartwork.cpp \
+    Models/Editing/deletekeywordsviewmodel.cpp \
+    Models/Editing/findandreplacemodel.cpp \
+    Models/Editing/quickbuffer.cpp \
+    Models/keyvaluelist.cpp \
+    Models/languagesmodel.cpp \
+    Models/logsmodel.cpp \
+    Models/Session/recentdirectoriesmodel.cpp \
+    Models/Session/recentfilesmodel.cpp \
+    Models/Session/recentitemsmodel.cpp \
+    Models/Session/sessionmanager.cpp \
+    Models/settingsmodel.cpp \
+    Models/switchermodel.cpp \
+    Models/uimanager.cpp \
+    Plugins/pluginactionsmodel.cpp \
+    Plugins/plugindatabasemanager.cpp \
+    Plugins/pluginenvironment.cpp \
+    Plugins/pluginmanager.cpp \
+    Plugins/pluginwrapper.cpp \
+    Plugins/sandboxeddependencies.cpp \
+    Plugins/uiprovider.cpp \
+    QMLExtensions/cachedimage.cpp \
+    QMLExtensions/cachedvideo.cpp \
+    QMLExtensions/cachingimageprovider.cpp \
+    QMLExtensions/colorsmodel.cpp \
+    QMLExtensions/dbimagecacheindex.cpp \
+    QMLExtensions/dbvideocacheindex.cpp \
+    QMLExtensions/folderelement.cpp \
+    QMLExtensions/imagecachingservice.cpp \
+    QMLExtensions/imagecachingworker.cpp \
+    QMLExtensions/proxyindexmiddlware.cpp \
+    QMLExtensions/tabsmodel.cpp \
+    QMLExtensions/triangleelement.cpp \
+    QMLExtensions/uicommanddispatcher.cpp \
+    QMLExtensions/uicommandlistener.cpp \
+    QMLExtensions/videocachingservice.cpp \
+    QMLExtensions/videocachingworker.cpp \
+    Services/artworkseditinghub.cpp \
+    Services/artworksupdatehub.cpp \
+    Services/AutoComplete/autocompletemodel.cpp \
+    Services/AutoComplete/autocompleteservice.cpp \
+    Services/AutoComplete/autocompleteworker.cpp \
+    Services/AutoComplete/keywordsautocompletemodel.cpp \
+    Services/AutoComplete/libfacecompletionengine.cpp \
+    Services/AutoComplete/presetscompletionengine.cpp \
+    Services/AutoComplete/stringsautocompletemodel.cpp \
+    Services/Maintenance/initializedictionariesjobitem.cpp \
+    Services/Maintenance/launchexiftooljobitem.cpp \
+    Services/Maintenance/logscleanupjobitem.cpp \
+    Services/Maintenance/maintenanceservice.cpp \
+    Services/Maintenance/maintenanceworker.cpp \
+    Services/Maintenance/savesessionjobitem.cpp \
+    Services/Maintenance/updatebundlecleanupjobitem.cpp \
+    Services/Maintenance/updatescleanupjobitem.cpp \
+    Services/Maintenance/xpkscleanupjob.cpp \
+    Services/SpellCheck/duplicateshighlighter.cpp \
+    Services/SpellCheck/duplicatesreviewmodel.cpp \
+    Services/SpellCheck/metadataduplicates.cpp \
+    Services/SpellCheck/spellcheckerrorshighlighter.cpp \
+    Services/SpellCheck/spellcheckinfo.cpp \
+    Services/SpellCheck/spellcheckitem.cpp \
+    Services/SpellCheck/spellcheckservice.cpp \
+    Services/SpellCheck/spellchecksuggestionmodel.cpp \
+    Services/SpellCheck/spellcheckworker.cpp \
+    Services/SpellCheck/spellsuggestionsitem.cpp \
+    Services/SpellCheck/spellsuggestionstarget.cpp \
+    Services/SpellCheck/userdicteditmodel.cpp \
+    Services/SpellCheck/userdictionary.cpp \
+    Services/Translation/translationmanager.cpp \
+    Services/Translation/translationquery.cpp \
+    Services/Translation/translationservice.cpp \
+    Services/Translation/translationworker.cpp \
+    Services/Warnings/warningscheckingworker.cpp \
+    Services/Warnings/warningsitem.cpp \
+    Services/Warnings/warningsmodel.cpp \
+    Services/Warnings/warningsservice.cpp \
+    Services/Warnings/warningssettingsmodel.cpp \
+    Storage/database.cpp \
+    Storage/databasemanager.cpp \
+    Storage/memorytable.cpp \
+    Suggestion/fotoliasuggestionengine.cpp \
+    Suggestion/gettysuggestionengine.cpp \
+    Suggestion/keywordssuggestor.cpp \
+    Suggestion/locallibraryqueryengine.cpp \
+    Suggestion/shutterstocksuggestionengine.cpp \
+    Suggestion/suggestionresultsresponse.cpp \
+    UndoRedo/artworkmetadatabackup.cpp \
+    UndoRedo/undoredomanager.cpp \
+    xpiksapp.cpp
 
 RESOURCES += qml.qrc
 
@@ -182,18 +235,70 @@ DEFINES += QT_MESSAGELOGCONTEXT
 # Additional import path used to resolve QML modules in Qt Creator's code model
 QML_IMPORT_PATH =
 
-ICON = xpiks-qt.icns
+CONFIG(debug, debug|release)  {
+    ICON = Graphics/xpiks-qt-dev.icns
+    RC_ICONS = Graphics/xpiks-qt-dev.ico
+} else {
+    ICON = Graphics/xpiks-qt.icns
+    RC_ICONS = Graphics/xpiks-qt.ico
+}
 
-RC_ICONS = xpiks-qt.ico
+# Default rules for deployment.
+include(deployment.pri)
 
 HEADERS += \
-    Models/artitemsmodel.h \
-    Models/artworkmetadata.h \
-    Helpers/globalimageprovider.h \
-    Models/artworksrepository.h \
-    Helpers/indiceshelper.h \
-    Helpers/clipboardhelper.h \
-    Models/combinedartworksmodel.h \
+    Artworks/artworkelement.h \
+    Artworks/artworkmetadata.h \
+    Artworks/artworkssnapshot.h \
+    Artworks/basickeywordsmodel.h \
+    Artworks/basickeywordsmodelimpl.h \
+    Artworks/basicmetadatamodel.h \
+    Artworks/basicmodelsource.h \
+    Artworks/iartworkmetadata.h \
+    Artworks/ibasicmodelsource.h \
+    Artworks/imageartwork.h \
+    Artworks/iselectedartworkssource.h \
+    Artworks/iselectedindicessource.h \
+    Artworks/keyword.h \
+    Artworks/videoartwork.h \
+    Commands/artworksupdatetemplate.h \
+    Commands/Base/actionmodelcommand.h \
+    Commands/Base/callbackcommand.h \
+    Commands/Base/commanduiwrapper.h \
+    Commands/Base/compositecommand.h \
+    Commands/Base/compositecommandtemplate.h \
+    Commands/Base/emptycommand.h \
+    Commands/Base/icommand.h \
+    Commands/Base/icommandmanager.h \
+    Commands/Base/icommandtemplate.h \
+    Commands/Base/iuicommandtemplate.h \
+    Commands/Base/templatedcommand.h \
+    Commands/Base/templateduicommand.h \
+    Commands/commandmanager.h \
+    Commands/Editing/clearactionmodeltemplate.h \
+    Commands/Editing/deletekeywordstemplate.h \
+    Commands/Editing/editartworkstemplate.h \
+    Commands/Editing/expandpresettemplate.h \
+    Commands/Editing/findandreplacetemplate.h \
+    Commands/Editing/keywordedittemplate.h \
+    Commands/Editing/modifyartworkscommand.h \
+    Commands/Editing/readmetadatatemplate.h \
+    Commands/Files/addfilescommand.h \
+    Commands/Files/addtorecenttemplate.h \
+    Commands/Files/removedirectorycommand.h \
+    Commands/Files/removefilescommand.h \
+    Commands/Files/removefilescommandbase.h \
+    Commands/Files/removeselectedfilescommand.h \
+    Commands/Services/autoimportmetadatacommand.h \
+    Commands/Services/cleanuplegacybackupscommand.h \
+    Commands/Services/generatethumbnailstemplate.h \
+    Commands/Services/savebackupstemplate.h \
+    Commands/Services/savesessioncommand.h \
+    Commands/UI/currenteditablecommands.h \
+    Commands/UI/generalcommands.h \
+    Commands/UI/selectedartworkscommands.h \
+    Commands/UI/singleeditablecommands.h \
+    Commands/UI/sourcetargetcommand.h \
     Common/abstractlistmodel.h \
     Helpers/constants.h \
     Models/artworkuploader.h \
@@ -229,191 +334,301 @@ HEADERS += \
     Models/settingsmodel.h \
     Helpers/loggingworker.h \
     Common/defines.h \
-    Models/filteredartitemsproxymodel.h \
+    Common/delayedactionentity.h \
     Common/flags.h \
-    Helpers/helpersqmlwrapper.h \
-    Models/recentdirectoriesmodel.h \
-    Common/version.h \
-    Connectivity/updateservice.h \
-    SpellCheck/spellcheckerservice.h \
-    SpellCheck/spellcheckitem.h \
-    SpellCheck/spellcheckworker.h \
-    SpellCheck/spellchecksuggestionmodel.h \
-    SpellCheck/spellcheckerrorshighlighter.h \
-    SpellCheck/spellcheckiteminfo.h \
-    Common/itemprocessingworker.h \
-    SpellCheck/spellsuggestionsitem.h \
-    Connectivity/analyticsuserevent.h \
-    Connectivity/updatescheckerworker.h \
-    Warnings/warningscheckingworker.h \
-    Warnings/warningsitem.h \
-    MetadataIO/metadataiocoordinator.h \
-    Connectivity/testconnection.h \
-    Connectivity/ftphelpers.h \
-    Plugins/xpiksplugininterface.h \
-    Commands/icommandmanager.h \
-    Commands/icommandbase.h \
-    UndoRedo/ihistoryitem.h \
-    UndoRedo/iundoredomanager.h \
-    Plugins/pluginmanager.h \
-    Plugins/pluginwrapper.h \
-    Plugins/ipluginaction.h \
-    Plugins/pluginactionsmodel.h \
-    Plugins/uiprovider.h \
-    Plugins/iuiprovider.h \
-    Common/ibasicartwork.h \
-    Common/iartworkssource.h \
-    Warnings/warningsservice.h \
-    Common/iservicebase.h \
-    Helpers/loghighlighter.h \
-    Warnings/warningsmodel.h \
-    Models/languagesmodel.h \
-    Helpers/filterhelpers.h \
-    Connectivity/iftpcoordinator.h \
-    QMLExtensions/triangleelement.h \
-    Suggestion/shutterstockqueryengine.h \
-    Suggestion/locallibraryqueryengine.h \
-    Suggestion/suggestionqueryenginebase.h \
-    Helpers/ifilenotavailablemodel.h \
-    Suggestion/fotoliaqueryengine.h \
-    QMLExtensions/colorsmodel.h \
-    Helpers/remoteconfig.h \
-    Helpers/localconfig.h \
-    Helpers/jsonhelper.h \
-    Helpers/comparevaluesjson.h \
-    AutoComplete/autocompleteworker.h \
-    AutoComplete/completionquery.h \
-    AutoComplete/autocompleteservice.h \
-    Suggestion/gettyqueryengine.h \
-    Models/abstractconfigupdatermodel.h \
-    AutoComplete/stocksftplistmodel.h \
-    Models/imageartwork.h \
-    Common/hold.h \
-    Models/proxysettings.h \
-    QMLExtensions/imagecachingworker.h \
-    QMLExtensions/imagecacherequest.h \
-    QMLExtensions/imagecachingservice.h \
-    QMLExtensions/cachingimageprovider.h \
-    Commands/findandreplacecommand.h \
-    Helpers/metadatahighlighter.h \
-    Models/findandreplacemodel.h \
-    Commands/deletekeywordscommand.h \
-    Models/deletekeywordsviewmodel.h \
-    Models/artworksviewmodel.h \
-    Helpers/keywordshelpers.h \
-    Connectivity/uploadwatcher.h \
     Common/iflagsprovider.h \
-    Warnings/warningssettingsmodel.h \
-    Connectivity/simplecurlrequest.h \
-    Connectivity/curlinithelper.h \
-    Connectivity/simplecurldownloader.h \
+    Common/isystemenvironment.h \
+    Common/itemprocessingworker.h \
+    Common/logging.h \
+    Common/lrucache.h \
+    Common/messages.h \
+    Common/readerwriterqueue.h \
+    Common/statefulentity.h \
+    Common/systemenvironment.h \
+    Common/types.h \
+    Common/version.h \
+    Common/wordanalysisresult.h \
+    Connectivity/analyticsuserevent.h \
     Connectivity/apimanager.h \
+    Connectivity/configrequest.h \
+    Connectivity/curlinithelper.h \
+    Connectivity/ftphelpers.h \
+    Connectivity/iconnectivityrequest.h \
+    Connectivity/iconnectivityresponse.h \
+    Connectivity/iftpcoordinator.h \
+    Connectivity/irequestsservice.h \
+    Connectivity/requestsservice.h \
+    Connectivity/requestsworker.h \
+    Connectivity/simpleapirequest.h \
+    Connectivity/simplecurldownloader.h \
+    Connectivity/simplecurlrequest.h \
+    Connectivity/switcherconfig.h \
+    Connectivity/telemetryservice.h \
+    Connectivity/telemetryworker.h \
+    Connectivity/testconnection.h \
+    Connectivity/updatescheckerworker.h \
+    Connectivity/updateservice.h \
+    Connectivity/uploadwatcher.h \
+    Encryption/aes-qt.h \
+    Encryption/isecretsstorage.h \
+    Encryption/obfuscation.h \
+    Encryption/secretpair.h \
+    Encryption/secretsmanager.h \
+    Filesystem/directoriescollection.h \
+    Filesystem/filescollection.h \
+    Filesystem/filesdirectoriescollection.h \
+    Filesystem/ifilescollection.h \
+    Helpers/artworkshelpers.h \
+    Helpers/asynccoordinator.h \
+    Helpers/clipboardhelper.h \
+    Helpers/comparevaluesjson.h \
+    Helpers/constants.h \
+    Helpers/cpphelpers.h \
+    Helpers/filehelpers.h \
+    Helpers/filterhelpers.h \
+    Helpers/globalimageprovider.h \
+    Helpers/hashhelpers.h \
+    Helpers/helpersqmlwrapper.h \
+    Helpers/indiceshelper.h \
+    Helpers/indicesranges.h \
+    Helpers/jsonhelper.h \
+    Helpers/jsonobjectmap.h \
+    Helpers/keywordshelpers.h \
+    Helpers/localconfig.h \
+    Helpers/logger.h \
+    Helpers/loggingworker.h \
+    Helpers/loghighlighter.h \
+    Helpers/metadatahighlighter.h \
+    Helpers/remoteconfig.h \
+    Helpers/runguard.h \
+    Helpers/stringhelper.h \
+    Helpers/threadhelpers.h \
+    Helpers/uihelpers.h \
     Helpers/updatehelpers.h \
-    Common/basicmetadatamodel.h \
+    Helpers/ziphelper.h \
+    KeywordsPresets/groupmodel.h \
+    KeywordsPresets/ipresetsmanager.h \
+    KeywordsPresets/presetgroupsmodel.h \
     KeywordsPresets/presetkeywordsmodel.h \
     KeywordsPresets/presetkeywordsmodelconfig.h \
-    QMLExtensions/folderelement.h \
-    Models/artworkproxymodel.h \
-    Models/artworkproxybase.h \
-    Common/imetadataoperator.h \
-    Translation/translationservice.h \
-    Translation/translationmanager.h \
-    Translation/translationworker.h \
-    Translation/translationquery.h \
+    KeywordsPresets/presetmodel.h \
+    MetadataIO/cachedartwork.h \
+    MetadataIO/csvexportmodel.h \
+    MetadataIO/csvexportplansmodel.h \
+    MetadataIO/csvexportproperties.h \
+    MetadataIO/csvexportworker.h \
+    MetadataIO/metadatacache.h \
+    MetadataIO/metadataiocoordinator.h \
+    MetadataIO/metadataioservice.h \
+    MetadataIO/metadataiotask.h \
+    MetadataIO/metadataioworker.h \
+    MetadataIO/metadatareadinghub.h \
+    MetadataIO/originalmetadata.h \
+    Microstocks/fotoliaapiclient.h \
+    Microstocks/gettyapiclient.h \
+    Microstocks/imicrostockapiclient.h \
+    Microstocks/imicrostockapiclients.h \
+    Microstocks/imicrostockservice.h \
+    Microstocks/imicrostockservices.h \
+    Microstocks/microstockapiclients.h \
+    Microstocks/microstockenums.h \
+    Microstocks/microstockservice.h \
+    Microstocks/searchquery.h \
+    Microstocks/shutterstockapiclient.h \
+    Microstocks/stockftpoptions.h \
+    Microstocks/stocksftplistmodel.h \
+    Models/Artworks/artworkslistmodel.h \
+    Models/Artworks/artworkslistoperations.h \
+    Models/Artworks/artworksrepository.h \
+    Models/Artworks/artworksviewmodel.h \
+    Models/Artworks/filteredartworkslistmodel.h \
+    Models/Connectivity/abstractconfigupdatermodel.h \
+    Models/Connectivity/artworksuploader.h \
+    Models/Connectivity/proxysettings.h \
+    Models/Connectivity/uploadinfo.h \
+    Models/Connectivity/uploadinforepository.h \
+    Models/Connectivity/ziparchiver.h \
+    Models/Editing/artworkproxybase.h \
+    Models/Editing/artworkproxymodel.h \
+    Models/Editing/combinedartworksmodel.h \
+    Models/Editing/currenteditableartwork.h \
+    Models/Editing/currenteditablemodel.h \
+    Models/Editing/currenteditableproxyartwork.h \
+    Models/Editing/deletekeywordsviewmodel.h \
+    Models/Editing/findandreplacemodel.h \
+    Models/Editing/icurrenteditable.h \
+    Models/Editing/previewartworkelement.h \
+    Models/Editing/quickbuffer.h \
+    Models/Editing/quickbuffermessage.h \
+    Models/exportinfo.h \
+    Models/iactionmodel.h \
+    Models/keyvaluelist.h \
+    Models/languagesmodel.h \
+    Models/logsmodel.h \
+    Models/Session/recentdirectoriesmodel.h \
+    Models/Session/recentfilesmodel.h \
+    Models/Session/recentitemsmodel.h \
+    Models/Session/sessionmanager.h \
+    Models/settingsmodel.h \
+    Models/switchermodel.h \
     Models/uimanager.h \
+    Plugins/ipluginaction.h \
+    Plugins/iuiprovider.h \
+    Plugins/pluginactionsmodel.h \
+    Plugins/plugindatabasemanager.h \
+    Plugins/pluginenvironment.h \
+    Plugins/pluginmanager.h \
+    Plugins/pluginwrapper.h \
     Plugins/sandboxeddependencies.h \
-    Commands/expandpresetcommand.h \
-    QuickBuffer/icurrenteditable.h \
-    QuickBuffer/currenteditableartwork.h \
-    QuickBuffer/currenteditableproxyartwork.h \
-    QuickBuffer/quickbuffer.h \
-    KeywordsPresets/ipresetsmanager.h \
-    SpellCheck/userdicteditmodel.h \
-    Helpers/asynccoordinator.h \
+    Plugins/uiprovider.h \
+    Plugins/xpiksplugininterface.h \
+    QMLExtensions/cachedimage.h \
+    QMLExtensions/cachedvideo.h \
+    QMLExtensions/cachingimageprovider.h \
+    QMLExtensions/colorsmodel.h \
+    QMLExtensions/dbcacheindex.h \
+    QMLExtensions/dbimagecacheindex.h \
+    QMLExtensions/dbvideocacheindex.h \
+    QMLExtensions/folderelement.h \
+    QMLExtensions/imagecacherequest.h \
+    QMLExtensions/imagecachingservice.h \
+    QMLExtensions/imagecachingworker.h \
+    QMLExtensions/iuicommandmiddleware.h \
+    QMLExtensions/previewstorage.h \
+    QMLExtensions/proxyindexmiddlware.h \
     QMLExtensions/tabsmodel.h \
-    Models/recentitemsmodel.h \
-    Models/recentfilesmodel.h \
-    Models/videoartwork.h \
-    Maintenance/maintenanceworker.h \
-    Maintenance/maintenanceservice.h \
-    Maintenance/imaintenanceitem.h \
-    Maintenance/logscleanupjobitem.h \
-    Maintenance/updatescleanupjobitem.h \
-    Maintenance/launchexiftooljobitem.h \
-    Maintenance/initializedictionariesjobitem.h \
-    Maintenance/movesettingsjobitem.h \
+    QMLExtensions/triangleelement.h \
+    QMLExtensions/uiaction.h \
+    QMLExtensions/uicommanddispatcher.h \
+    QMLExtensions/uicommandid.h \
+    QMLExtensions/uicommandlistener.h \
+    QMLExtensions/videocacherequest.h \
     QMLExtensions/videocachingservice.h \
     QMLExtensions/videocachingworker.h \
-    QMLExtensions/videocacherequest.h \
-    QMLExtensions/artworksupdatehub.h \
-    QMLExtensions/artworkupdaterequest.h \
-    Models/keyvaluelist.h \
-    Helpers/filehelpers.h \
-    Helpers/artworkshelpers.h \
-    Models/sessionmanager.h \
-    Maintenance/savesessionjobitem.h \
-    Connectivity/switcherconfig.h \
-    Models/switchermodel.h \
-    Connectivity/requestsworker.h \
-    Connectivity/requestsservice.h \
-    Warnings/iwarningsitem.h \
-    AutoComplete/completionitem.h \
-    Helpers/database.h \
-    AutoComplete/completionitem.h \
-    Common/statefulentity.h \
-    QMLExtensions/previewstorage.h \
-    QMLExtensions/cachedimage.h \
-    QMLExtensions/dbimagecacheindex.h \
-    Maintenance/moveimagecachejobitem.h \
-    QMLExtensions/dbcacheindex.h \
-    QMLExtensions/cachedvideo.h \
-    QMLExtensions/dbvideocacheindex.h \
-    MetadataIO/cachedartwork.h \
-    MetadataIO/metadatacache.h \
-    Common/readerwriterqueue.h \
-    MetadataIO/metadataioworker.h \
-    MetadataIO/metadataiotask.h \
-    MetadataIO/metadataioservice.h \
-    MetadataIO/originalmetadata.h \
-    Suggestion/searchquery.h \
+    Services/artworkseditinghub.h \
+    Services/artworksupdatehub.h \
+    Services/artworkupdaterequest.h \
+    Services/AutoComplete/autocompletemodel.h \
+    Services/AutoComplete/autocompleteservice.h \
+    Services/AutoComplete/autocompleteworker.h \
+    Services/AutoComplete/completionenginebase.h \
+    Services/AutoComplete/completionitem.h \
+    Services/AutoComplete/completionquery.h \
+    Services/AutoComplete/icompletionsource.h \
+    Services/AutoComplete/keywordsautocompletemodel.h \
+    Services/AutoComplete/libfacecompletionengine.h \
+    Services/AutoComplete/presetscompletionengine.h \
+    Services/AutoComplete/stringsautocompletemodel.h \
+    Services/iartworksupdater.h \
+    Services/Maintenance/imaintenanceitem.h \
+    Services/Maintenance/initializedictionariesjobitem.h \
+    Services/Maintenance/launchexiftooljobitem.h \
+    Services/Maintenance/logscleanupjobitem.h \
+    Services/Maintenance/maintenanceservice.h \
+    Services/Maintenance/maintenanceworker.h \
+    Services/Maintenance/savesessionjobitem.h \
+    Services/Maintenance/updatebundlecleanupjobitem.h \
+    Services/Maintenance/updatescleanupjobitem.h \
+    Services/Maintenance/xpkscleanupjob.h \
+    Services/SpellCheck/duplicateshighlighter.h \
+    Services/SpellCheck/duplicatesreviewmodel.h \
+    Services/SpellCheck/imetadataduplicates.h \
+    Services/SpellCheck/ispellcheckable.h \
+    Services/SpellCheck/ispellcheckservice.h \
+    Services/SpellCheck/ispellsuggestionstarget.h \
+    Services/SpellCheck/metadataduplicates.h \
+    Services/SpellCheck/spellcheckerrorshighlighter.h \
+    Services/SpellCheck/spellcheckinfo.h \
+    Services/SpellCheck/spellcheckitem.h \
+    Services/SpellCheck/spellcheckservice.h \
+    Services/SpellCheck/spellchecksuggestionmodel.h \
+    Services/SpellCheck/spellcheckworker.h \
+    Services/SpellCheck/spellsuggestionsitem.h \
+    Services/SpellCheck/spellsuggestionstarget.h \
+    Services/SpellCheck/userdicteditmodel.h \
+    Services/SpellCheck/userdictionary.h \
+    Services/Translation/translationmanager.h \
+    Services/Translation/translationquery.h \
+    Services/Translation/translationservice.h \
+    Services/Translation/translationworker.h \
+    Services/Warnings/iwarningsitem.h \
+    Services/Warnings/iwarningssettings.h \
+    Services/Warnings/warningscheckingworker.h \
+    Services/Warnings/warningsitem.h \
+    Services/Warnings/warningsmodel.h \
+    Services/Warnings/warningsservice.h \
+    Services/Warnings/warningssettingsmodel.h \
+    Storage/database.h \
+    Storage/databasemanager.h \
+    Storage/idatabase.h \
+    Storage/idatabasemanager.h \
+    Storage/memorytable.h \
+    Storage/writeaheadlog.h \
+    Suggestion/fotoliasuggestionengine.h \
+    Suggestion/gettysuggestionengine.h \
+    Suggestion/isuggestionengine.h \
+    Suggestion/isuggestionsrepository.h \
+    Suggestion/keywordssuggestor.h \
     Suggestion/locallibraryquery.h \
-    MetadataIO/artworkssnapshot.h \
-    Connectivity/connectivityrequest.h \
-    MetadataIO/metadatareadinghub.h \
-    AutoComplete/completionenginebase.h \
-    AutoComplete/libfacecompletionengine.h \
-    Common/wordanalysisresult.h \
-    AutoComplete/autocompletemodel.h \
-    AutoComplete/keywordsautocompletemodel.h \
-    AutoComplete/stringsautocompletemodel.h \
-    AutoComplete/presetscompletionengine.h \
-    Common/keyword.h \
-    SpellCheck/duplicatesreviewmodel.h \
-    SpellCheck/duplicateshighlighter.h \
-    MetadataIO/csvexportworker.h \
-    MetadataIO/csvexportproperties.h \
-    MetadataIO/csvexportplansmodel.h \
-    MetadataIO/csvexportmodel.h \
-    Common/delayedactionentity.h \
-    Models/artworkelement.h \
-    Models/previewartworkelement.h \
-    Helpers/threadhelpers.h \
-    KeywordsPresets/presetgroupsmodel.h \
-    UndoRedo/removedirectoryitem.h
+    Suggestion/locallibraryqueryengine.h \
+    Suggestion/microstocksuggestionengine.h \
+    Suggestion/shutterstocksuggestionengine.h \
+    Suggestion/suggestionartwork.h \
+    Suggestion/suggestionresultsresponse.h \
+    UndoRedo/artworkmetadatabackup.h \
+    UndoRedo/iundoredomanager.h \
+    UndoRedo/undoredomanager.h \
+    xpiksapp.h
 
 DISTFILES += \
+    ../xpiks-common/xpiks-common.pri \
+    AppHost.qml \
+    CollapserTabs/FilesFoldersIcon.qml \
+    CollapserTabs/FilesFoldersTab.qml \
+    CollapserTabs/QuickBufferIcon.qml \
+    CollapserTabs/QuickBufferTab.qml \
+    CollapserTabs/TranslatorIcon.qml \
+    CollapserTabs/TranslatorTab.qml \
+    Components/AddIcon.qml \
+    Components/BackGlyphButton.qml \
+    Components/CheckedComponent.qml \
     Components/CloseIcon.qml \
+    Components/ComboBoxPopup.qml \
+    Components/CompletionBox.qml \
+    Components/CustomBorder.qml \
+    Components/CustomScrollbar.qml \
+    Components/CustomTab.qml \
+    Components/CustomTooltip.qml \
+    Components/DonateComponent.qml \
+    Components/DotsButton.qml \
+    Components/DraggableKeywordWrapper.qml \
+    Components/DropdownPopup.qml \
+    Components/EditIcon.qml \
     Components/EditableTags.qml \
-    StyledControls/SimpleProgressBar.qml \
-    StyledControls/StyledButton.qml \
-    StyledControls/StyledCheckbox.qml \
-    StyledControls/StyledScrollView.qml \
-    StyledControls/StyledText.qml \
-    StyledControls/StyledTextInput.qml \
+    Components/GlyphButton.qml \
+    Components/KeywordWrapper.qml \
+    Components/LargeAddIcon.qml \
+    Components/LayoutButton.qml \
+    Components/LoaderIcon.qml \
+    Components/PresentationSlide.qml \
+    Components/SelectedIcon.qml \
+    Components/SuggestionWrapper.qml \
+    Components/ToolButton.qml \
+    Components/ZoomAmplifier.qml \
+    Constants/UIConfig.js \
+    Dialogs/AboutWindow.qml \
+    Dialogs/AddPresetGroupDialog.qml \
+    Dialogs/CsvExportDialog.qml \
+    Dialogs/DeleteKeywordsDialog.qml \
+    Dialogs/DonateDialog.qml \
+    Dialogs/EditKeywordDialog.qml \
+    Dialogs/EnterMasterPasswordDialog.qml \
     Dialogs/ExportMetadata.qml \
+    Dialogs/FailedUploadArtworks.qml \
+    Dialogs/FindAndReplace.qml \
     Dialogs/ImportMetadata.qml \
-    Dialogs/SettingsWindow.qml \
-    Dialogs/UploadArtworks.qml \
+    Dialogs/InstallUpdateDialog.qml \
+    Dialogs/KeywordsSuggestion.qml \
     Dialogs/LogsDialog.qml \
     StyledControls/StyledTextEdit.qml \
     Dialogs/WarningsDialog.qml \
@@ -441,62 +656,29 @@ DISTFILES += \
     Dialogs/WhatsNewDialog.qml \
     Dialogs/TermsAndConditionsDialog.qml \
     Dialogs/PluginsDialog.qml \
-    Components/LayoutButton.qml \
-    Graphics/vector-icon.svg \
-    Constants/UIConfig.js \
-    Components/SelectedIcon.qml \
-    Components/CompletionBox.qml \
-    Components/EditIcon.qml \
-    uncrustify.cfg \
-    Components/PresentationSlide.qml \
-    Graphics/faileduploads.png \
-    Graphics/gears.png \
-    Graphics/findandreplace.png \
-    Graphics/presets.png \
-    Graphics/quickbuffer.png \
-    Graphics/translator.png \
+    Dialogs/PresetsEditDialog.qml \
     Dialogs/ProxySetupDialog.qml \
     Dialogs/WhatsNewMinorDialog.qml \
     Dialogs/FindAndReplace.qml \
     Dialogs/ReplacePreview.qml \
-    Dialogs/DeleteKeywordsDialog.qml \
-    Dialogs/FailedUploadArtworks.qml \
-    Dialogs/InstallUpdateDialog.qml \
-    Components/CustomTab.qml \
-    StackViews/MainGrid.qml \
-    StackViews/ArtworkEditView.qml \
-    Components/ZoomAmplifier.qml \
-    StackViews/WarningsView.qml \
-    Components/GlyphButton.qml \
-    Components/BackGlyphButton.qml \
-    StackViews/CombinedEditView.qml \
-    Dialogs/PresetsEditDialog.qml \
+    Dialogs/SettingsWindow.qml \
+    Dialogs/SimplePreview.qml \
+    Dialogs/SpellCheckSuggestionsDialog.qml \
+    Dialogs/TermsAndConditionsDialog.qml \
     Dialogs/TranslationPreviewDialog.qml \
-    CollapserTabs/FilesFoldersTab.qml \
-    CollapserTabs/TranslatorTab.qml \
-    CollapserTabs/FilesFoldersIcon.qml \
-    CollapserTabs/TranslatorIcon.qml \
-    CollapserTabs/QuickBufferIcon.qml \
-    CollapserTabs/QuickBufferTab.qml \
+    Dialogs/UpdateWindow.qml \
+    Dialogs/UploadArtworks.qml \
     Dialogs/UserDictEditDialog.qml \
-    Components/LoaderIcon.qml \
-    Graphics/black/Icon_donate.svg \
-    Graphics/slategray/Icon_donate.svg \
-    Dialogs/DonateDialog.qml \
-    Components/DonateComponent.qml \
-    StackViews/DuplicatesReView.qml \
-    StyledControls/StyledLink.qml \
-    Dialogs/CsvExportDialog.qml \
-    Components/DotsButton.qml \
-    Dialogs/AddPresetGroupDialog.qml \
-    Components/DropdownPopup.qml \
-    Components/ComboBoxPopup.qml \
-    Components/ToolButton.qml \
-    Components/CustomTooltip.qml \
+    Dialogs/WarningsDialog.qml \
+    Dialogs/WhatsNewDialog.qml \
+    Dialogs/WhatsNewMinorDialog.qml \
+    Dialogs/WipeMetadata.qml \
+    Dialogs/ZipArtworksDialog.qml \
     Graphics/black/Edit_icon_clicked.svg \
     Graphics/black/Edit_icon_disabled.svg \
     Graphics/black/Edit_icon_hovered.svg \
     Graphics/black/Edit_icon_normal.svg \
+    Graphics/black/Icon_donate.svg \
     Graphics/black/Remove_icon_clicked.svg \
     Graphics/black/Remove_icon_disabled.svg \
     Graphics/black/Remove_icon_hovered.svg \
@@ -509,10 +691,20 @@ DISTFILES += \
     Graphics/black/Upload_icon_disabled.svg \
     Graphics/black/Upload_icon_hovered.svg \
     Graphics/black/Upload_icon_normal.svg \
+    Graphics/faileduploads.png \
+    Graphics/findandreplace.png \
+    Graphics/gears.png \
+    Graphics/presets.png \
+    Graphics/quickbuffer.png \
     Graphics/slategray/Edit_icon_clicked.svg \
     Graphics/slategray/Edit_icon_disabled.svg \
     Graphics/slategray/Edit_icon_hovered.svg \
     Graphics/slategray/Edit_icon_normal.svg \
+    Graphics/slategray/Icon_donate.svg \
+    Graphics/slategray/More_icon_clicked.svg \
+    Graphics/slategray/More_icon_disabled.svg \
+    Graphics/slategray/More_icon_hovered.svg \
+    Graphics/slategray/More_icon_normal.svg \
     Graphics/slategray/Remove_icon_clicked.svg \
     Graphics/slategray/Remove_icon_disabled.svg \
     Graphics/slategray/Remove_icon_hovered.svg \
@@ -525,10 +717,27 @@ DISTFILES += \
     Graphics/slategray/Upload_icon_disabled.svg \
     Graphics/slategray/Upload_icon_hovered.svg \
     Graphics/slategray/Upload_icon_normal.svg \
-    Graphics/slategray/More_icon_clicked.svg \
-    Graphics/slategray/More_icon_disabled.svg \
-    Graphics/slategray/More_icon_hovered.svg \
-    Graphics/slategray/More_icon_normal.svg
+    Graphics/translator.png \
+    Graphics/vector-icon.svg \
+    StackViews/ArtworkEditView.qml \
+    StackViews/CombinedEditView.qml \
+    StackViews/DuplicatesReView.qml \
+    StackViews/MainGrid.qml \
+    StackViews/WarningsView.qml \
+    StyledControls/SimpleProgressBar.qml \
+    StyledControls/StyledAddHostButton.qml \
+    StyledControls/StyledBlackButton.qml \
+    StyledControls/StyledButton.qml \
+    StyledControls/StyledCheckbox.qml \
+    StyledControls/StyledLink.qml \
+    StyledControls/StyledScrollView.qml \
+    StyledControls/StyledSlider.qml \
+    StyledControls/StyledTabView.qml \
+    StyledControls/StyledText.qml \
+    StyledControls/StyledTextEdit.qml \
+    StyledControls/StyledTextInput.qml \
+    uncrustify.cfg \
+    xpiks-qt.ico
 
 lupdate_only {
 SOURCES += *.qml \
@@ -540,12 +749,8 @@ SOURCES += *.qml \
           StackViews/*.qml
 }
 
-INCLUDEPATH += ../../vendors/tiny-aes
-INCLUDEPATH += ../../vendors/cpp-libface
-INCLUDEPATH += ../../vendors/ssdll/src/ssdll
-INCLUDEPATH += ../../vendors/hunspell-1.6.0/src
-INCLUDEPATH += ../../vendors/libthmbnlr
-INCLUDEPATH += ../../vendors/libxpks
+INCLUDEPATH += ./
+INCLUDEPATH += ../../
 
 CONFIG(debug, debug|release)  {
     LIBS += -L"$$PWD/../../libs/debug"
@@ -561,13 +766,20 @@ LIBS += -lquazip5
 LIBS += -lz
 LIBS += -lthmbnlr
 LIBS += -lxpks
+LIBS += -lchillout
 LIBS += -ldl
 
 BUILDNO=$$system(git log -n 1 --pretty=format:"%h")
 BRANCH_NAME=$$system(git rev-parse --abbrev-ref HEAD)
 
+include(../xpiks-common/xpiks-common.pri)
+
+DEFINES += WITH_UPDATES
+DEFINES += WITH_LOGS
+
 CONFIG(debug, debug|release)  {
     message("Building debug")
+    DEFINES += WITH_STDOUT_LOGS
     DEFINES += WITH_PLUGINS
     DEFINES += WITH_LOGS
     DEFINES += WITH_STDOUT_LOGS
@@ -575,6 +787,79 @@ CONFIG(debug, debug|release)  {
 } else {
     DEFINES += WITH_LOGS
     message("Building release")
+}
+
+macx {
+    QMAKE_TARGET_BUNDLE_PREFIX = com.xpiksapp
+    QMAKE_BUNDLE = Xpiks
+
+    LIBS += -ldl
+
+    INCLUDEPATH += "../../vendors/libcurl/include"
+
+    LIBS += -lavcodec.57
+    LIBS += -lavfilter.6
+    LIBS += -lavformat.57
+    LIBS += -lavutil.55
+    LIBS += -lswscale.4
+
+    HUNSPELL_DICT_FILES.files = deps/dict/en_US.aff deps/dict/en_US.dic deps/dict/license.txt deps/dict/README_en_US.txt
+    HUNSPELL_DICT_FILES.path = Contents/Resources/dict
+    QMAKE_BUNDLE_DATA += HUNSPELL_DICT_FILES
+
+    WHATS_NEW.files = deps/whatsnew.txt
+    WHATS_NEW.path = Contents/Resources
+    QMAKE_BUNDLE_DATA += WHATS_NEW
+
+    TRANSLATIONS_FILES_LIST = $$system(ls $$PWD/deps/translations/*.qm)
+    XPIKS_TRANSLATIONS.files = $$TRANSLATIONS_FILES_LIST
+    XPIKS_TRANSLATIONS.path = Contents/Resources/translations
+    QMAKE_BUNDLE_DATA += XPIKS_TRANSLATIONS
+
+    FREQ_TABLES.files = deps/ac_sources/en_wordlist.tsv
+    FREQ_TABLES.path = Contents/Resources/ac_sources
+    QMAKE_BUNDLE_DATA += FREQ_TABLES
+
+    RECOVERTY.files = deps/recoverty/Recoverty.app
+    RECOVERTY.path = Contents/MacOS/
+    QMAKE_BUNDLE_DATA += RECOVERTY
+}
+
+win32 {
+    DEFINES += QT_NO_PROCESS_COMBINED_ARGUMENT_START
+    QT += winextras
+    DEFINES += ZLIB_WINAPI \
+               ZLIB_DLL
+    INCLUDEPATH += "../../vendors/zlib-1.2.11"
+    INCLUDEPATH += "../../vendors/libcurl/include"
+
+    LIBS -= -lcurl
+
+    LIBS += -lavcodec
+    LIBS += -lavfilter
+    LIBS += -lavformat
+    LIBS += -lavutil
+    LIBS += -lswscale
+
+    CONFIG(debug, debug|release) {
+        LIBS += -llibcurl_debug
+        LIBS -= -lquazip
+        LIBS += -lquazipd
+    }
+
+    CONFIG(release, debug|release) {
+        LIBS += -llibcurl
+    }
+
+    LIBS += -lmman
+    # chillout deps
+    LIBS += -lAdvapi32 -lDbgHelp
+
+    # recoverty steps
+    RECOVERTY_DIR = recoverty
+    copyrecoverty.commands = $(COPY_FILE) \"$$shell_path($$DEPS_DIR/$$RECOVERTY_DIR/Recoverty*)\" \"$$shell_path($$OUT_PWD/$$EXE_DIR/)\"
+    QMAKE_EXTRA_TARGETS += copyrecoverty
+    POST_TARGETDEPS += copyrecoverty
 }
 
 travis-ci {
@@ -586,9 +871,6 @@ travis-ci {
     DEFINES += TRAVIS_CI
     INCLUDEPATH += "../../vendors/quazip"
 
-    LIBS -= -lthmbnlr
-    SOURCES += ../../vendors/libthmbnlr/thumbnailcreator_stub.cpp
-}
 
 unix:!macx {
     message("for Linux")
@@ -613,15 +895,18 @@ linux-qtcreator {
     POST_TARGETDEPS += copywhatsnew copyterms
 }
 
-linux-static {
-    CONFIG += static
-    QTPLUGIN += qt5quick
-    DEFINES += STATIC
-    message("Static build.")
-}
+with-video {
+    message("With video")
+    LIBS += -lavcodec
+    LIBS += -lavfilter
+    LIBS += -lavformat
+    LIBS += -lavutil
+    LIBS += -lswscale
 
-# Default rules for deployment.
-include(deployment.pri)
+    LIBS += -lthmbnlr
+
+    SOURCES += ../../vendors/libthmbnlr/thumbnailcreator_stub.cpp
+}
 
 DEFINES += BUILDNUMBER=$${BUILDNO}
 DEFINES += BRANCHNAME=$${BRANCH_NAME}

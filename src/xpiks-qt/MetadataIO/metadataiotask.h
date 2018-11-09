@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,23 +11,26 @@
 #ifndef METADATAIOTASK_H
 #define METADATAIOTASK_H
 
-#include "../Models/artworkmetadata.h"
-#include "../Suggestion/locallibraryquery.h"
+#include <memory>
+
+namespace Artworks {
+    class ArtworkMetadata;
+}
+
+namespace Suggestion {
+    class LocalLibraryQuery;
+}
 
 namespace MetadataIO {
-    class MetadataIOTaskBase: public Models::ArtworkMetadataLocker
+    class MetadataIOTaskBase
     {
     public:
-        MetadataIOTaskBase(Models::ArtworkMetadata *metadata):
-            Models::ArtworkMetadataLocker(metadata)
-        {
-        }
+        virtual ~MetadataIOTaskBase() {}
     };
 
     class MetadataSearchTask: public MetadataIOTaskBase {
     public:
         MetadataSearchTask(Suggestion::LocalLibraryQuery *query):
-            MetadataIOTaskBase(nullptr),
             m_Query(query)
         {
         }
@@ -39,14 +42,6 @@ namespace MetadataIO {
         Suggestion::LocalLibraryQuery *m_Query;
     };
 
-    class MetadataCacheSyncTask: public MetadataIOTaskBase {
-    public:
-        MetadataCacheSyncTask():
-            MetadataIOTaskBase(nullptr)
-        {
-        }
-    };
-
     class MetadataReadWriteTask: public MetadataIOTaskBase {
     public:
         enum ReadWriteAction {
@@ -56,15 +51,17 @@ namespace MetadataIO {
         };
 
     public:
-        MetadataReadWriteTask(Models::ArtworkMetadata *metadata, ReadWriteAction readWriteAction):
-            MetadataIOTaskBase(metadata),
+        MetadataReadWriteTask(std::shared_ptr<Artworks::ArtworkMetadata> const &artwork, ReadWriteAction readWriteAction):
+            m_Artwork(artwork),
             m_ReadWriteAction(readWriteAction)
         {}
 
     public:
         ReadWriteAction getReadWriteAction() const { return m_ReadWriteAction; }
+        std::shared_ptr<Artworks::ArtworkMetadata> const &getArtworkMetadata() const { return m_Artwork; }
 
     private:
+        std::shared_ptr<Artworks::ArtworkMetadata> m_Artwork;
         ReadWriteAction m_ReadWriteAction;
     };
 }

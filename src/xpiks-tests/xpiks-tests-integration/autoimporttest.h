@@ -6,8 +6,8 @@
 class AutoImportTest : public IntegrationTestBase
 {
 public:
-    AutoImportTest(Commands::CommandManager *commandManager):
-        IntegrationTestBase(commandManager)
+    AutoImportTest(IntegrationTestsEnvironment &environment, XpiksTestsApp &testsApp):
+        IntegrationTestBase(environment, testsApp)
     {}
 
     // IntegrationTestBase interface

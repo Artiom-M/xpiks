@@ -6,8 +6,8 @@
 class ClearMetadataTest : public IntegrationTestBase
 {
 public:
-    ClearMetadataTest(Commands::CommandManager *commandManager):
-        IntegrationTestBase(commandManager)
+    ClearMetadataTest(IntegrationTestsEnvironment &environment, XpiksTestsApp &testsApp):
+        IntegrationTestBase(environment, testsApp)
     {}
 
     // IntegrationTestBase interface

@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -16,7 +16,7 @@ import "../Constants"
 Button {
     activeFocusOnTab: false
     property color defaultForeground: uiColors.buttonDefaultForeground
-    property color hoverForeground: defaultForeground
+    property color hoverForeground: uiColors.buttonHoverForeground
 
     style: ButtonStyle {
         background: Rectangle {
@@ -31,25 +31,29 @@ Button {
                 return result
             }
             implicitWidth: control.width
-            implicitHeight: 24
+            implicitHeight: control.height > 24 ? control.height : 24
         }
 
         label: StyledText {
             font.bold: true
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
+            text: control.text
             color: {
                 var result = uiColors.defaultControlColor;
 
                 if (control.enabled) {
-                    result = control.pressed ? uiColors.buttonPressedForeground : (control.hovered ? control.hoverForeground : control.defaultForeground);
+                    if (control.pressed) {
+                        result = uiColors.buttonPressedForeground
+                    } else {
+                        result = (control.hovered || control.isDefault) ? control.hoverForeground : control.defaultForeground;
+                    }
                 } else {
                     result = uiColors.inactiveControlColor;
                 }
 
                 return result
             }
-            text: control.text
         }
     }
 }

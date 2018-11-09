@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,8 +9,18 @@
  */
 
 #include "tabsmodel.h"
-#include "../Common/defines.h"
+
 #include <algorithm>
+#include <cstddef>
+
+#include <QAbstractItemModel>
+#include <QByteArray>
+#include <QList>
+#include <QtAlgorithms>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Common/logging.h"
 
 namespace QMLExtensions {
     bool compareCachePairs(const TabsModel::CachedTab &left, const TabsModel::CachedTab &right) {
@@ -39,9 +49,7 @@ namespace QMLExtensions {
         case TabIconPathRole: return tab.m_TabIconPath;
         case TabComponentPathRole: return tab.m_TabComponentPath;
         case ExternalTabIDRole: return tab.m_ExternalTabID;
-#ifdef QT_DEBUG
         case CacheTagRole: return tab.m_CacheTag;
-#endif
         default: return QVariant();
         }
     }
@@ -51,9 +59,7 @@ namespace QMLExtensions {
         roles[TabIconPathRole] = "tabicon";
         roles[TabComponentPathRole] = "tabcomponent";
         roles[ExternalTabIDRole] = "tabid";
-#ifdef QT_DEBUG
         roles[CacheTagRole] = "cachetag";
-#endif
         return roles;
     }
 

@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -26,7 +26,7 @@ Item {
     anchors.fill: parent
 
     property variant componentParent
-    property var deleteKeywordsModel: helpersWrapper.getDeleteKeywordsModel()
+    property var deleteKeywordsModel: dispatcher.getCommandTarget(UICommand.SetupDeleteKeywordsInSelected)
 
     signal dialogDestruction();
     Component.onDestruction: dialogDestruction();
@@ -34,7 +34,6 @@ Item {
     Keys.onEscapePressed: closePopup()
 
     function closePopup() {
-        deleteKeywordsModel.resetModel()
         deleteKeywordsComponent.destroy()
     }
 
@@ -43,19 +42,16 @@ Item {
     }
 
     Connections {
-        target: helpersWrapper
+        target: xpiksApp
         onGlobalBeforeDestruction: {
-            console.debug("UI:DeleteKeywordsDialog # global
-CloseRequested")
+            console.debug("UI:DeleteKeywordsDialog # global CloseRequested")
             closePopup()
         }
     }
 
     Connections {
         target: deleteKeywordsModel
-        onRequestCloseWindow: {
-            closePopup();
-        }
+        onRequestCloseWindow: closePopup()
     }
 
     PropertyAnimation { target: deleteKeywordsComponent; property: "opacity";
@@ -91,18 +87,43 @@ CloseRequested")
 
         Menu {
             id: subMenu
+            property var defaultGroupModel: presetsGroups.getDefaultGroupModel()
             title: i18.n + qsTr("Insert preset")
 
             Instantiator {
-                model: presetsModel
-                onObjectAdded:{
-                    subMenu.insertItem( index, object )
-                }
+                model: presetsGroups
+                onObjectAdded: subMenu.insertItem( index, object )
                 onObjectRemoved: subMenu.removeItem( object )
+                delegate: Menu {
+                    id: groupMenu
+                    property int delegateIndex: index
+                    property var groupModel: presetsGroups.getGroupModel(index)
+                    title: gname
+
+                    Instantiator {
+                        model: groupMenu.groupModel
+                        onObjectAdded: groupMenu.insertItem( index, object )
+                        onObjectRemoved: groupMenu.removeItem( object )
+
+                        delegate: MenuItem {
+                            text: name
+                            onTriggered: {
+                                deleteKeywordsModel.addPreset(groupMenu.groupModel.getOriginalID(index))
+                            }
+                        }
+                    }
+                }
+            }
+
+            Instantiator {
+                model: subMenu.defaultGroupModel
+                onObjectAdded: subMenu.insertItem( index, object )
+                onObjectRemoved: subMenu.removeItem( object )
+
                 delegate: MenuItem {
                     text: name
                     onTriggered: {
-                        deleteKeywordsModel.addPreset(presetsMenu.artworkIndex);
+                        deleteKeywordsModel.addPreset(subMenu.defaultGroupModel.getOriginalID(index))
                     }
                 }
             }
@@ -153,7 +174,7 @@ CloseRequested")
             anchors.bottomMargin: -glowRadius/2
             glowRadius: 4
             spread: 0.0
-            color: uiColors.defaultControlColor
+            color: uiColors.popupGlowColor
             cornerRadius: glowRadius
         }
 
@@ -260,14 +281,6 @@ CloseRequested")
                                 orientation: Qt.Horizontal
                                 spacing: 10
                                 model: deleteKeywordsModel
-
-                                add: Transition {
-                                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 230 }
-                                }
-
-                                remove: Transition {
-                                    NumberAnimation { property: "opacity"; to: 0; duration: 230 }
-                                }
 
                                 displaced: Transition {
                                     NumberAnimation { properties: "x,y"; duration: 230 }
@@ -386,7 +399,7 @@ CloseRequested")
                             anchors.rightMargin: 20
                             Layout.fillWidth: true
                             color: enabled ? uiColors.inputBackgroundColor : uiColors.inputInactiveBackground
-                            property var keywordsModel: deleteKeywordsModel.getKeywordsToDeleteModel()
+                            property var keywordsModel: deleteKeywordsModel.getKeywordsToDeleteObject()
 
                             function removeKeyword(index) {
                                 deleteKeywordsModel.removeKeywordToDeleteAt(index)
@@ -406,7 +419,7 @@ CloseRequested")
 
                             EditableTags {
                                 id: flv
-                                objectName: "keywordsInput"
+                                objectName: "deleteEditableTags"
                                 anchors.fill: parent
                                 model: keywordsToDeleteWrapper.keywordsModel
                                 property int keywordHeight: uiManager.keywordHeight
@@ -519,7 +532,7 @@ CloseRequested")
                             anchors.rightMargin: 20
                             Layout.fillWidth: true
                             color: uiColors.inputInactiveBackground
-                            property var keywordsModel: deleteKeywordsModel.getCommonKeywordsModel()
+                            property var keywordsModel: deleteKeywordsModel.getCommonKeywordsObject()
 
                             function removeKeyword(index) {
                                 var keyword = deleteKeywordsModel.removeCommonKeywordAt(index)
@@ -530,7 +543,7 @@ CloseRequested")
 
                             EditableTags {
                                 id: flvCommon
-                                objectName: "keywordsInput"
+                                objectName: "commonEditableTags"
                                 anchors.fill: parent
                                 model: commonKeywordsWrapper.keywordsModel
                                 property int keywordHeight: uiManager.keywordHeight
@@ -613,7 +626,7 @@ CloseRequested")
                             width: 100
                             onClicked: {
                                 flv.onBeforeClose()
-                                deleteKeywordsModel.deleteKeywords()
+                                dispatcher.dispatch(UICommand.DeleteKeywordsInSelected, true)
                                 closePopup()
                             }
                         }
@@ -622,10 +635,11 @@ CloseRequested")
                             text: i18.n + qsTr("Cancel")
                             width: 100
                             onClicked: {
+                                dispatcher.dispatch(UICommand.DeleteKeywordsInSelected, false)
                                 closePopup()
                             }
 
-                            tooltip: "Exit with no changes"
+                            tooltip: qsTr("Exit without changes", "tooltip")
                         }
                     }
                 }

@@ -9,7 +9,7 @@ QT += gui qml
 TARGET = xpks
 TEMPLATE = lib
 CONFIG += staticlib
-CONFIG += c++11
+CONFIG += c++14
 
 DEFINES += QT_NO_CAST_TO_ASCII \
            QT_RESTRICTED_CAST_FROM_ASCII \
@@ -36,6 +36,7 @@ CONFIG(debug, debug|release)  {
 }
 
 INCLUDEPATH += ../xpiks-qt
+INCLUDEPATH += ../../vendors/libxpks
 
 LIBS += -lcurl
 
@@ -68,23 +69,25 @@ unix {
 }
 
 HEADERS += \
-    MetadataIO/metadatareadingworker.h \
-    MetadataIO/metadatawritingworker.h \
-    MetadataIO/readingorchestrator.h \
-    MetadataIO/writingorchestrator.h \
-    Connectivity/ftpcoordinator.h \
+    ../../vendors/libxpks/apisecretsstorage.h \
+    ../../vendors/libxpks/ftpcoordinator.h \
+    ../../vendors/libxpks/readingorchestrator.h \
+    ../../vendors/libxpks/uploadcontext.h \
+    ../../vendors/libxpks/writingorchestrator.h \
     Connectivity/conectivityhelpers.h \
     Connectivity/curlftpuploader.h \
     Connectivity/ftpuploaderworker.h \
     Connectivity/uploadbatch.h \
-    Connectivity/uploadcontext.h
+    MetadataIO/metadatareadingworker.h \
+    MetadataIO/metadatawritingworker.h
 
 SOURCES += \
+    Connectivity/conectivityhelpers.cpp \
+    Connectivity/curlftpuploader.cpp \
+    Connectivity/ftpcoordinator.cpp \
+    Connectivity/ftpuploaderworker.cpp \
     MetadataIO/metadatareadingworker.cpp \
     MetadataIO/metadatawritingworker.cpp \
     MetadataIO/readingorchestrator.cpp \
     MetadataIO/writingorchestrator.cpp \
-    Connectivity/conectivityhelpers.cpp \
-    Connectivity/curlftpuploader.cpp \
-    Connectivity/ftpcoordinator.cpp \
-    Connectivity/ftpuploaderworker.cpp
+    Microstocks/apisecretsstorage.cpp

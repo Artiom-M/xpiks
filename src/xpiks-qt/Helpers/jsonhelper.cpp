@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,6 +9,19 @@
  */
 
 #include "jsonhelper.h"
+
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonValue>
+#include <QJsonValueRef>
+#include <QSet>
+#include <QString>
+#include <QStringList>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Common/logging.h"
+#include "Helpers/comparevaluesjson.h"
 
 namespace Helpers {
     bool mergeJsonArrays(const QJsonArray &arrayFrom, QJsonArray &arrayTo, CompareValuesJson &comparer);
@@ -160,7 +173,7 @@ namespace Helpers {
     }
 
     bool mergeJsonObjects(const QJsonObject &objectMergeFrom, QJsonObject &objectMergeTo, CompareValuesJson &comparer) {
-        LOG_INTEGR_TESTS_OR_DEBUG << "#";
+        LOG_VERBOSE_OR_DEBUG << "#";
 
         QStringList keysMergeFrom = objectMergeFrom.keys();
         int keysSize = keysMergeFrom.size();

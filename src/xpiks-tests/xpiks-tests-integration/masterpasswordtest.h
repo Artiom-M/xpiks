@@ -6,8 +6,8 @@
 class MasterPasswordTest: public IntegrationTestBase
 {
 public:
-    MasterPasswordTest(Commands::CommandManager *commandManager):
-        IntegrationTestBase(commandManager)
+    MasterPasswordTest(IntegrationTestsEnvironment &environment, XpiksTestsApp &testsApp):
+        IntegrationTestBase(environment, testsApp)
     { }
 
     // IntegrationTestBase interface

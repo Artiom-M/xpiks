@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -25,7 +25,7 @@ Item {
     id: keywordsSuggestionComponent
     objectName: "keywordsSuggestionComponent"
     anchors.fill: parent
-    property var callbackObject
+    property var keywordsSuggestor: dispatcher.getCommandTarget(UICommand.InitSuggestionArtwork)
     property bool initialized: false
 
     signal dialogDestruction();
@@ -135,14 +135,14 @@ Item {
             anchors.bottomMargin: -glowRadius/2
             glowRadius: 4
             spread: 0.0
-            color: uiColors.defaultControlColor
+            color: uiColors.popupGlowColor
             cornerRadius: glowRadius
         }
 
         // This rectangle is the actual popup
         Rectangle {
             id: dialogWindow
-            property bool isTooNarrow: parent.width <= 1100
+            property bool isTooNarrow: parent.width <= 1150
             width: Math.max(900, Math.min(1100, parent.width - 200))
             height: Math.min(parent.height - 40, 700)
             color: uiColors.popupBackgroundColor
@@ -178,6 +178,7 @@ Item {
 
                         StyledTextInput {
                             id: queryText
+                            objectName: "queryTextInput"
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.leftMargin: 5
@@ -203,11 +204,15 @@ Item {
                         glowTopMargin: 2
                         globalParent: keywordsSuggestionComponent
                         onComboItemSelected: {
+                            keywordsSuggestor.searchTypeIndex = searchTypeCombobox.selectedIndex
                         }
+
+                        Component.onCompleted: searchTypeCombobox.selectedIndex = keywordsSuggestor.searchTypeIndex
                     }
 
                     StyledButton {
                         anchors.right: parent.right
+                        objectName: "searchButton"
                         text: i18.n + qsTr("Search")
                         width: 100
                         activeFocusOnPress: true
@@ -245,6 +250,7 @@ Item {
 
                             Repeater {
                                 id: suggestionsRepeater
+                                objectName: "suggestionsRepeater"
                                 model: keywordsSuggestor
 
                                 delegate: Item {
@@ -351,7 +357,8 @@ Item {
 
                     ComboBoxPopup {
                         id: sourceComboBox
-                        model: keywordsSuggestor.getEngineNames()
+                        objectName: "engineComboBox"
+                        model: keywordsSuggestor.engineNames
                         anchors.right: parent.right
                         width: 200
                         height: 24
@@ -417,6 +424,7 @@ Item {
 
                         EditableTags {
                             id: suggestedFlv
+                            objectName: "suggestedEditableTags"
                             anchors.fill: parent
                             model: keywordsSuggestor.getSuggestedKeywordsModel()
                             property int keywordHeight: uiManager.keywordHeight
@@ -511,6 +519,7 @@ Item {
 
                         EditableTags {
                             id: otherFlv
+                            objectName: "otherEditableTags"
                             anchors.fill: parent
                             model: keywordsSuggestor.getAllOtherKeywordsModel()
                             property int keywordHeight: uiManager.keywordHeight
@@ -565,7 +574,9 @@ Item {
                     anchors.right: parent.right
 
                     /*StyledText {
-                        text: i18.n + (keywordsSuggestor.selectedArtworksCount !== 1 ? qsTr("%1 selected items").arg(keywordsSuggestor.selectedArtworksCount) : qsTr("1 selected item"))
+                        text: i18.n + (keywordsSuggestor.selectedArtworksCount !== 1 ?
+                                           qsTr("%1 selected items").arg(keywordsSuggestor.selectedArtworksCount) :
+                                           qsTr("1 selected item"))
                     }*/
 
                     Item {
@@ -587,6 +598,7 @@ Item {
 
                     StyledButton {
                         width: 100
+                        objectName: "closeButton"
                         text: i18.n + qsTr("Close")
                         onClicked: closePopup()
                     }
@@ -598,13 +610,14 @@ Item {
                     StyledButton {
                         id: addKeywordsButton
                         isDefault: true
+                        objectName: "addSuggestedButton"
                         text: i18.n + qsTr("Add suggested")
                         enabled: !keywordsSuggestor.isInProgress && (keywordsSuggestor.suggestedKeywordsCount > 0)
                         width: 150
                         onClicked: {
                             console.log("Add suggested clicked")
                             addKeywordsButton.enabled = false
-                            callbackObject.promoteKeywords(keywordsSuggestor.getSuggestedKeywords())
+                            dispatcher.dispatch(UICommand.AppendSuggestedKeywords, keywordsSuggestor.getSuggestedKeywords())
                             suggestedAddedTimer.start()
                         }
                     }

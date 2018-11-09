@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -12,21 +12,24 @@
 #define IMAGECACHINGSERVICE_H
 
 #include <QObject>
-#include <QString>
-#include <QVector>
 #include <QSize>
-#include <vector>
-#include <memory>
-#include "../Common/baseentity.h"
-#include "../Common/iservicebase.h"
+#include <QString>
+#include <QtGlobal>
 
-namespace Models {
-    class ArtworkMetadata;
-    class ArtworkMetadataLocker;
+namespace Common {
+    class ISystemEnvironment;
 }
 
-namespace MetadataIO {
+namespace Artworks {
     class ArtworksSnapshot;
+}
+
+namespace Storage {
+    class IDatabaseManager;
+}
+
+namespace Helpers {
+    class AsyncCoordinator;
 }
 
 class QScreen;
@@ -34,14 +37,15 @@ class QScreen;
 namespace QMLExtensions {
     class ImageCachingWorker;
 
-    class ImageCachingService : public QObject, public Common::BaseEntity
+    class ImageCachingService : public QObject
     {
         Q_OBJECT
     public:
-        explicit ImageCachingService(QObject *parent = 0);
+        explicit ImageCachingService(Common::ISystemEnvironment &environment,
+                                     QObject *parent = 0);
 
     public:
-        void startService(const std::shared_ptr<Common::ServiceStartParams> &params);
+        void startService(Helpers::AsyncCoordinator &coordinator, Storage::IDatabaseManager &dbManager);
         void stopService();
         void upgradeCacheStorage();
 
@@ -52,7 +56,7 @@ namespace QMLExtensions {
         void setScale(qreal scale);
         void cacheImage(const QString &key, const QSize &requestedSize, bool recache=false);
         void cacheImage(const QString &key);
-        void generatePreviews(const MetadataIO::ArtworksSnapshot &snapshot);
+        void generatePreviews(const Artworks::ArtworksSnapshot &snapshot);
         bool tryGetCachedImage(const QString &key, const QSize &requestedSize, QString &cached, bool &needsUpdate);
 
     private:
@@ -63,6 +67,7 @@ namespace QMLExtensions {
         void dpiChanged(qreal someDPI);
 
     private:
+        Common::ISystemEnvironment &m_Environment;
         ImageCachingWorker *m_CachingWorker;
         QSize m_DefaultSize;
         volatile bool m_IsCancelled;

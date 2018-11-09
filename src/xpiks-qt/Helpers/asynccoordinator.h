@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,10 +11,13 @@
 #ifndef ASYNCCOORDINATOR_H
 #define ASYNCCOORDINATOR_H
 
-#include <QObject>
 #include <QAtomicInt>
+#include <QObject>
+#include <QString>
 #include <QTimer>
-#include "../Common/iservicebase.h"
+#include <QtDebug>
+
+#include "Common/logging.h"
 
 namespace Helpers {
     class AsyncCoordinator: public QObject
@@ -52,25 +55,13 @@ namespace Helpers {
         QAtomicInt m_StatusReported;
     };
 
-    class AsyncCoordinatorStartParams: public Common::ServiceStartParams {
-    public:
-        AsyncCoordinatorStartParams(AsyncCoordinator *coordinator):
-            m_Coordinator(coordinator)
-        {
-        }
-
-    public:
-        AsyncCoordinator *m_Coordinator;
-    };
-
     class AsyncCoordinatorLocker {
     public:
-        AsyncCoordinatorLocker(AsyncCoordinator *coordinator):
+        AsyncCoordinatorLocker(AsyncCoordinator &coordinator):
             m_Coordinator(coordinator)
         {
-            if (m_Coordinator != nullptr) {
-                m_Coordinator->aboutToBegin();
-            }
+            LOG_DEBUG << "#";
+            m_Coordinator.aboutToBegin();
         }
 
         virtual ~AsyncCoordinatorLocker() {
@@ -80,12 +71,12 @@ namespace Helpers {
         }
 
     private:
-        AsyncCoordinator *m_Coordinator;
+        AsyncCoordinator &m_Coordinator;
     };
 
     class AsyncCoordinatorUnlocker {
     public:
-        AsyncCoordinatorUnlocker(AsyncCoordinator *coordinator):
+        AsyncCoordinatorUnlocker(AsyncCoordinator &coordinator):
             m_Coordinator(coordinator)
         {
             // if (m_Coordinator != nullptr) {
@@ -94,31 +85,29 @@ namespace Helpers {
         }
 
         virtual ~AsyncCoordinatorUnlocker() {
-            if (m_Coordinator != nullptr) {
-                m_Coordinator->justEnded();
-            }
+            LOG_DEBUG << "#";
+            m_Coordinator.justEnded();
         }
 
     private:
-        AsyncCoordinator *m_Coordinator;
+        AsyncCoordinator &m_Coordinator;
     };
 
     class AsyncCoordinatorStarter {
     public:
-        AsyncCoordinatorStarter(AsyncCoordinator *coordinator, int timeout):
+        AsyncCoordinatorStarter(AsyncCoordinator &coordinator, int timeout):
             m_Coordinator(coordinator),
             m_Timeout(timeout)
         {
         }
 
         virtual ~AsyncCoordinatorStarter() {
-            if (m_Coordinator != nullptr) {
-                m_Coordinator->allBegun(m_Timeout);
-            }
+            LOG_DEBUG << "#";
+            m_Coordinator.allBegun(m_Timeout);
         }
 
     private:
-        AsyncCoordinator *m_Coordinator;
+        AsyncCoordinator &m_Coordinator;
         int m_Timeout;
     };
 }

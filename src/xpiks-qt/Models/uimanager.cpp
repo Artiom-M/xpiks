@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,11 +9,20 @@
  */
 
 #include "uimanager.h"
-#include "../Common/defines.h"
-#include "../QuickBuffer/currenteditableartwork.h"
-#include "../QuickBuffer/currenteditableproxyartwork.h"
-#include "artworkmetadata.h"
-#include "../Models/settingsmodel.h"
+
+#include <QQmlEngine>
+#include <QQuickTextDocument>
+#include <QScreen>
+#include <QSet>
+#include <QtDebug>
+
+#include "Artworks/basicmetadatamodel.h"
+#include "Common/logging.h"
+#include "Helpers/constants.h"
+#include "Helpers/loghighlighter.h"
+#include "Models/settingsmodel.h"
+#include "QMLExtensions/tabsmodel.h"
+#include "Services/SpellCheck/spellcheckinfo.h"
 
 #define MAX_SAVE_PAUSE_RESTARTS 5
 
@@ -24,17 +33,20 @@
 #define DEFAULT_APP_POSITION -1
 
 namespace Models {
-    UIManager::UIManager(SettingsModel *settingsModel, QObject *parent) :
+    UIManager::UIManager(Common::ISystemEnvironment &environment,
+                         QMLExtensions::ColorsModel &colorsModel,
+                         SettingsModel &settingsModel,
+                         QObject *parent) :
         QObject(parent),
-        Common::StatefulEntity("uimanager"),
         Common::DelayedActionEntity(500, MAX_SAVE_PAUSE_RESTARTS),
+        m_State("uimanager", environment),
+        m_ColorsModel(colorsModel),
         m_SettingsModel(settingsModel),
         m_TabID(42),
-        m_SaveTimerId(-1),
-        m_SaveRestartsCount(0)
+        m_ScreenDPI(96.0)
     {
-        Q_ASSERT(settingsModel != nullptr);
-        QObject::connect(m_SettingsModel, &Models::SettingsModel::keywordSizeScaleChanged, this, &UIManager::keywordHeightChanged);
+        QObject::connect(&m_SettingsModel, &Models::SettingsModel::keywordSizeScaleChanged,
+                         this, &UIManager::keywordHeightChanged);
 
         m_ActiveTabs.setSourceModel(&m_TabsModel);
         m_InactiveTabs.setSourceModel(&m_TabsModel);
@@ -48,22 +60,18 @@ namespace Models {
         QObject::connect(&m_InactiveTabs, &QMLExtensions::InactiveTabsModel::tabOpened, &m_ActiveTabs, &QMLExtensions::ActiveTabsModel::onInactiveTabOpened);
     }
 
+    void UIManager::setScreenDpi(double value) {
+        LOG_INFO << value;
+        if (value != m_ScreenDPI) {
+            m_ScreenDPI = value;
+            emit screenDpiChanged();
+        }
+    }
+
     double UIManager::getKeywordHeight() const {
-        double keywordScale = m_SettingsModel->getKeywordSizeScale();
+        double keywordScale = m_SettingsModel.getKeywordSizeScale();
         double height = 20.0 * keywordScale + (keywordScale - 1.0) * 10.0;
         return height;
-    }
-
-    void UIManager::registerCurrentItem(std::shared_ptr<QuickBuffer::ICurrentEditable> &currentItem) {
-        LOG_DEBUG << "#";
-        m_CurrentEditable = std::move(currentItem);
-        emit currentEditableChanged();
-    }
-
-    void UIManager::clearCurrentItem() {
-        LOG_DEBUG << "#";
-        m_CurrentEditable.reset();
-        emit currentEditableChanged();
     }
 
     QObject *UIManager::retrieveTabsModel(int tabID) {
@@ -76,64 +84,97 @@ namespace Models {
         return model;
     }
 
+    void UIManager::sync() {
+        LOG_DEBUG << "#";
+        m_State.sync();
+    }
+
     int UIManager::getArtworkEditRightPaneWidth() {
-        return getStateInt(Constants::artworkEditRightPaneWidth, DEFAULT_ARTWORK_EDIT_RIGHT_PANE_WIDTH);
+        return m_State.getInt(Constants::artworkEditRightPaneWidth, DEFAULT_ARTWORK_EDIT_RIGHT_PANE_WIDTH);
     }
 
     void UIManager::setArtworkEditRightPaneWidth(int value) {
         const int current = getArtworkEditRightPaneWidth();
         if (current != value) {
-            setStateValue(Constants::artworkEditRightPaneWidth, value);
+            m_State.setValue(Constants::artworkEditRightPaneWidth, value);
             justChanged();
             emit artworkEditRightPaneWidthChanged();
         }
     }
 
     int UIManager::getAppWidth(int defaultWidth)  {
-        return getStateInt(Constants::appWindowWidth, defaultWidth);
+        return m_State.getInt(Constants::appWindowWidth, defaultWidth);
     }
 
     void UIManager::setAppWidth(int width) {
         LOG_DEBUG << width;
-        setStateValue(Constants::appWindowWidth, width);
+        m_State.setValue(Constants::appWindowWidth, width);
         justChanged();
     }
 
     int UIManager::getAppHeight(int defaultHeight) {
-        return getStateInt(Constants::appWindowHeight, defaultHeight);
+        return m_State.getInt(Constants::appWindowHeight, defaultHeight);
     }
 
     void UIManager::setAppHeight(int height) {
         LOG_DEBUG << height;
-        setStateValue(Constants::appWindowHeight, height);
+        m_State.setValue(Constants::appWindowHeight, height);
         justChanged();
     }
 
-    int UIManager::getAppPosX(int defaultPosX) {
-        int posX = getStateInt(Constants::appWindowX, defaultPosX);
-        if (posX == -1) { posX = defaultPosX; }
+    int UIManager::getAppPosX(int defaultPosX, int maxPosX) {
+        Q_ASSERT(defaultPosX < maxPosX);
+        int posX = m_State.getInt(Constants::appWindowX, defaultPosX);
+        if ((posX < 0) || (posX >= maxPosX)) { posX = defaultPosX; }
         return posX;
     }
 
     void UIManager::setAppPosX(int x) {
         LOG_DEBUG << x;
-        setStateValue(Constants::appWindowX, x);
+        m_State.setValue(Constants::appWindowX, x);
         justChanged();
     }
 
-    int UIManager::getAppPosY(int defaultPosY) {
-        int posY = getStateInt(Constants::appWindowY, defaultPosY);
-        if (posY == -1) { posY = defaultPosY; }
+    int UIManager::getAppPosY(int defaultPosY, int maxPosY) {
+        Q_ASSERT(defaultPosY < maxPosY);
+        int posY = m_State.getInt(Constants::appWindowY, defaultPosY);
+        if ((posY < 0) || (posY >= maxPosY)) { posY = defaultPosY; }
         return posY;
     }
 
     void UIManager::setAppPosY(int y) {
         LOG_DEBUG << y;
-        setStateValue(Constants::appWindowY, y);
+        m_State.setValue(Constants::appWindowY, y);
         justChanged();
     }
 
+    void UIManager::initDescriptionHighlighting(QObject *basicModelObject, QQuickTextDocument *document) {
+        Artworks::BasicMetadataModel *basicModel = qobject_cast<Artworks::BasicMetadataModel*>(basicModelObject);
+        if (basicModel != nullptr) {
+            SpellCheck::SpellCheckInfo &info = basicModel->getSpellCheckInfo();
+            info.createHighlighterForDescription(document->textDocument(), &m_ColorsModel, basicModel);
+            basicModel->notifyDescriptionSpellingChanged();
+        }
+    }
+
+    void UIManager::initTitleHighlighting(QObject *basicModelObject, QQuickTextDocument *document) {
+        Artworks::BasicMetadataModel *basicModel = qobject_cast<Artworks::BasicMetadataModel*>(basicModelObject);
+        if (basicModel != nullptr) {
+            SpellCheck::SpellCheckInfo &info = basicModel->getSpellCheckInfo();
+            info.createHighlighterForTitle(document->textDocument(), &m_ColorsModel, basicModel);
+            basicModel->notifyDescriptionSpellingChanged();
+        }
+    }
+
+    void UIManager::initLogsHighlighting(QQuickTextDocument *document) {
+        LOG_DEBUG << "#";
+        Helpers::LogHighlighter *highlighter = new Helpers::LogHighlighter(m_ColorsModel,
+                                                                           document->textDocument());
+        Q_UNUSED(highlighter);
+    }
+
     void UIManager::activateQuickBufferTab() {
+        LOG_DEBUG << "#";
         if (m_TabsModel.activateSystemTab(QUICKBUFFER_TAB_ID)) {
             m_ActiveTabs.reactivateMostRecentTab();
         }
@@ -212,24 +253,57 @@ namespace Models {
         m_TabsModel.touchTab(0);
     }
 
-    void UIManager::initializeState() {
-         initState();
+    void UIManager::initialize() {
+        LOG_DEBUG << "#";
+        m_State.init();
     }
 
     void UIManager::resetWindowSettings() {
         // resetting position in settings is pretty useless because
         // we will overwrite them on Xpiks exit. But anyway for the future...
-        setStateValue(Constants::appWindowHeight, DEFAULT_APP_HEIGHT);
-        setStateValue(Constants::appWindowWidth, DEFAULT_APP_WIDTH);
-        setStateValue(Constants::appWindowX, DEFAULT_APP_POSITION);
-        setStateValue(Constants::appWindowY, DEFAULT_APP_POSITION);
+        m_State.setValue(Constants::appWindowHeight, DEFAULT_APP_HEIGHT);
+        m_State.setValue(Constants::appWindowWidth, DEFAULT_APP_WIDTH);
+        m_State.setValue(Constants::appWindowX, DEFAULT_APP_POSITION);
+        m_State.setValue(Constants::appWindowY, DEFAULT_APP_POSITION);
 
-        setStateValue(Constants::artworkEditRightPaneWidth, DEFAULT_ARTWORK_EDIT_RIGHT_PANE_WIDTH);
+        m_State.setValue(Constants::artworkEditRightPaneWidth, DEFAULT_ARTWORK_EDIT_RIGHT_PANE_WIDTH);
 
         justChanged();
     }
 
+    void UIManager::onScreenDpiChanged(qreal someDpi) {
+        Q_UNUSED(someDpi);
+        QScreen *screen = qobject_cast<QScreen*>(sender());
+        updateDpi(screen);
+    }
+
+    void UIManager::onScreenChanged(QScreen *screen) {
+        updateDpi(screen);
+
+        if (screen != nullptr) {
+            QObject::connect(screen, &QScreen::logicalDotsPerInchChanged,
+                             this, &Models::UIManager::onScreenDpiChanged);
+            QObject::connect(screen, &QScreen::physicalDotsPerInchChanged,
+                             this, &Models::UIManager::onScreenDpiChanged);
+        }
+    }
+
+    void UIManager::updateDpi(QScreen *screen) {
+        if (screen != nullptr) {
+            LOG_INFO << "Device pixel ratio:" << screen->devicePixelRatio();
+            LOG_INFO << "Logical dots per inch:" << screen->logicalDotsPerInch();
+
+            qreal dpi;
+#ifdef Q_OS_WIN
+            dpi = screen->logicalDotsPerInch() * screen->devicePixelRatio();
+#else
+            dpi = screen->physicalDotsPerInch() * screen->devicePixelRatio();
+#endif
+            setScreenDpi(dpi);
+        }
+    }
+
     void UIManager::doOnTimer() {
-        syncState();
+        m_State.sync();
     }
 }

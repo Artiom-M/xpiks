@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,11 +11,16 @@
 #ifndef FOLDERELEMENT_H
 #define FOLDERELEMENT_H
 
-#include <QtQuick/QQuickItem>
-#include <QtQuick/QQuickWindow>
-#include <QBrush>
-#include <QSGGeometry>
+#include <QColor>
+#include <QObject>
+#include <QQuickItem>
 #include <QSGFlatColorMaterial>
+#include <QSGGeometry>
+#include <QString>
+#include <QtGlobal>
+
+class QQuickWindow;
+class QSGNode;
 
 namespace QMLExtensions {
     class FolderElement : public QQuickItem
@@ -24,7 +29,7 @@ namespace QMLExtensions {
         Q_PROPERTY(QColor color READ getColor WRITE setColor NOTIFY colorChanged)
         Q_PROPERTY(qreal thickness READ getThickness WRITE setThickness NOTIFY thicknessChanged)
     public:
-        FolderElement(QQuickItem *parent=0);
+        FolderElement(QQuickItem *parent=nullptr);
 
     public:
         const QColor &getColor() const { return m_Color; }

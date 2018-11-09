@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,22 +11,41 @@
 #ifndef DBCACHEINDEX_H
 #define DBCACHEINDEX_H
 
-#include <QString>
-#include <QHash>
-#include <QReadWriteLock>
-#include <QMutex>
 #include <memory>
 #include <functional>
-#include "previewstorage.h"
-#include "../Helpers/database.h"
-#include "../Common/defines.h"
+
+#include <QByteArray>
+#include <QDataStream>
+#include <QDebug>
+#include <QHash>
+#include <QIODevice>
+#include <QMutex>
+#include <QMutexLocker>
+#include <QReadLocker>
+#include <QReadWriteLock>
+#include <QString>
+#include <QVector>
+#include <QWriteLocker>
+#include <QtGlobal>
+
+#include "Common/logging.h"
+#include "QMLExtensions/previewstorage.h"
+#include "Storage/idatabase.h"
+#include "Storage/writeaheadlog.h"
+
+template <class T1, class T2> struct QPair;
+
+namespace Storage {
+    class IDatabaseManager;
+}
 
 namespace QMLExtensions {
     template<class TValue>
-    class IndexWriteAheadLog: public Helpers::WriteAheadLog<QString, TValue> {
+    class IndexWriteAheadLog: public Storage::WriteAheadLog<QString, TValue> {
     protected:
         virtual QByteArray keyToByteArray(const QString &key) const override { return key.toUtf8(); }
-        virtual bool doFlush(std::shared_ptr<Helpers::Database::Table> &dbTable, const QVector<QPair<QByteArray, QByteArray> > &keyValuesList, QVector<int> &failedIndices) override {
+        virtual QString keyFromByteArray(const QByteArray &rawKey) const override { return QString::fromUtf8(rawKey); }
+        virtual bool doFlush(std::shared_ptr<Storage::IDbTable> &dbTable, const QVector<QPair<QByteArray, QByteArray> > &keyValuesList, QVector<int> &failedIndices) override {
             return dbTable->trySetMany(keyValuesList, failedIndices);
         }
     };
@@ -35,11 +54,10 @@ namespace QMLExtensions {
     class DbCacheIndex: public PreviewStorage<QString, TValue>
     {
     public:
-        DbCacheIndex(Helpers::DatabaseManager *dbManager):
+        DbCacheIndex(Storage::IDatabaseManager &dbManager):
             m_DatabaseManager(dbManager),
             m_MaxCacheTag(0)
         {
-            Q_ASSERT(dbManager != nullptr);
         }
 
     public:
@@ -114,6 +132,7 @@ namespace QMLExtensions {
 
         bool getFromDB(const QString &key, /*out*/ TValue &value) {
             if (!m_DbCacheIndex) { return false; }
+
             bool success = false;
 
             QByteArray rawValue;
@@ -235,9 +254,9 @@ namespace QMLExtensions {
         // guard for get statement accessed from UI thread
         // and from ImageCachingWorker thread
         QMutex m_ReadMutex;
-        Helpers::DatabaseManager *m_DatabaseManager;
-        std::shared_ptr<Helpers::Database::Table> m_DbCacheIndex;
-        std::shared_ptr<Helpers::Database> m_Database;
+        Storage::IDatabaseManager &m_DatabaseManager;
+        std::shared_ptr<Storage::IDbTable> m_DbCacheIndex;
+        std::shared_ptr<Storage::IDatabase> m_Database;
         IndexWriteAheadLog<TValue> m_WAL;
         QReadWriteLock m_CacheLock;
         QHash<QString, TValue> m_CacheIndex;

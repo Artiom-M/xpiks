@@ -6,8 +6,8 @@
 class AddFilesBasicTest : public IntegrationTestBase
 {
 public:
-    AddFilesBasicTest(Commands::CommandManager *commandManager):
-        IntegrationTestBase(commandManager)
+    AddFilesBasicTest(IntegrationTestsEnvironment &environment, XpiksTestsApp &testsApp):
+        IntegrationTestBase(environment, testsApp)
     {}
 
     // IntegrationTestBase interface

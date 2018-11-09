@@ -1,7 +1,7 @@
 /*
  * This file is a part of Xpiks - cross platform application for
  * keywording and uploading images for microstocks
- * Copyright (C) 2014-2017 Taras Kushnir <kushnirTV@gmail.com>
+ * Copyright (C) 2014-2018 Taras Kushnir <kushnirTV@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -9,10 +9,28 @@
  */
 
 #include "csvexportmodel.h"
+
+#include <utility>
+
+#include <QAbstractItemModel>
+#include <QByteArray>
+#include <QDir>
+#include <QFlags>
+#include <QModelIndex>
 #include <QQmlEngine>
 #include <QStandardPaths>
-#include "csvexportworker.h"
-#include <QTimerEvent>
+#include <QThread>
+#include <QUrl>
+#include <QVector>
+#include <QtDebug>
+#include <QtGlobal>
+
+#include "Artworks/artworkssnapshot.h"
+#include "Common/delayedactionentity.h"
+#include "Common/logging.h"
+#include "MetadataIO/csvexportplansmodel.h"
+#include "MetadataIO/csvexportproperties.h"
+#include "MetadataIO/csvexportworker.h"
 
 #define MAX_SAVE_PAUSE_RESTARTS 5
 
@@ -224,9 +242,9 @@ namespace MetadataIO {
 
     /*------------------------------------------------------*/
 
-    CsvExportModel::CsvExportModel():
-        Common::BaseEntity(),
+    CsvExportModel::CsvExportModel(Common::ISystemEnvironment &environment):
         Common::DelayedActionEntity(3000, MAX_SAVE_PAUSE_RESTARTS),
+        m_ExportPlansModel(environment),
         m_SaveTimerId(-1),
         m_SaveRestartsCount(0),
         m_IsExporting(false)
@@ -246,27 +264,15 @@ namespace MetadataIO {
         }
     }
 
-    void CsvExportModel::setOutputDirectory(const QString &value) {
-        if (m_ExportDirectory != value) {
-            m_ExportDirectory = value;
-            emit outputDirectoryChanged();
-        }
-    }
-
-    void CsvExportModel::setCommandManager(Commands::CommandManager *commandManager) {
-        Common::BaseEntity::setCommandManager(commandManager);
-
-        m_ExportPlansModel.setCommandManager(commandManager);
-    }
-
-    void CsvExportModel::setupModel(MetadataIO::ArtworksSnapshot::Container &rawSnapshot) {
-        m_ArtworksToExport.set(rawSnapshot);
-        emit artworksCountChanged();
-    }
-
-    void CsvExportModel::initializeExportPlans(Helpers::AsyncCoordinator *initCoordinator) {
+    void CsvExportModel::initializeExportPlans(Helpers::AsyncCoordinator &initCoordinator,
+                                               Connectivity::IRequestsService &requestsService) {
         LOG_DEBUG << "#";
-        m_ExportPlansModel.initializeConfigs(initCoordinator);
+        m_ExportPlansModel.initializeConfigs(initCoordinator, requestsService);
+    }
+
+    void CsvExportModel::setArtworksToExport(Artworks::ArtworksSnapshot &&snapshot) {
+        m_ArtworksToExport = std::move(snapshot);
+        emit artworksCountChanged();
     }
 
     int CsvExportModel::rowCount(const QModelIndex &parent) const {
@@ -363,8 +369,9 @@ namespace MetadataIO {
 
         QString exportDirectory = m_ExportDirectory;
 
-        if (exportDirectory.isEmpty()) {
+        if (exportDirectory.isEmpty() || !QDir(exportDirectory).exists()) {
             exportDirectory = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+            LOG_INFO << "Export directory is not valid. Saving to Downloads directory...";
         }
 
         CsvExportWorker *exportWorker = new CsvExportWorker(m_ExportPlans, m_ArtworksToExport, exportDirectory);
@@ -384,11 +391,6 @@ namespace MetadataIO {
         thread->start();
 
         setIsExporting(true);
-    }
-
-    void CsvExportModel::clearModel() {
-        LOG_DEBUG << "#";
-        m_ArtworksToExport.clear();
     }
 
     void CsvExportModel::removePlanAt(int row) {
@@ -415,7 +417,7 @@ namespace MetadataIO {
         beginInsertRows(QModelIndex(), size, size);
         {
             QString name = QObject::tr("Untitled");
-            m_ExportPlans.emplace_back(new CsvExportPlan(name));
+            m_ExportPlans.emplace_back(std::make_shared<CsvExportPlan>(name));
         }
         endInsertRows();
 
@@ -443,6 +445,15 @@ namespace MetadataIO {
         justChanged();
     }
 
+    void CsvExportModel::setOutputDirectory(const QUrl &url) {
+        LOG_INFO << url;
+
+        QString localFile = url.toLocalFile();
+        if (localFile != m_ExportDirectory) {
+            m_ExportDirectory = localFile;
+        }
+    }
+
     void CsvExportModel::saveExportPlans() {
         LOG_DEBUG << "#";
         m_ExportPlansModel.sync(m_ExportPlans);
@@ -459,6 +470,24 @@ namespace MetadataIO {
 
         return count;
     }
+
+#if defined(INTEGRATION_TESTS) || defined(UI_TESTS)
+    void CsvExportModel::clearModel() {
+        LOG_DEBUG << "#";
+        m_ExportPlans.erase(
+                    std::remove_if(m_ExportPlans.begin(), m_ExportPlans.end(),
+                                   [](const std::shared_ptr<CsvExportPlan> &plan) { return !plan->m_IsSystemPlan; }),
+                    m_ExportPlans.end());
+
+        for (auto &p: m_ExportPlans) { p->m_IsSelected = false; }
+    }
+
+    void CsvExportModel::resetModel() {
+        LOG_DEBUG << "#";
+        clearModel();
+        m_ArtworksToExport.clear();
+    }
+#endif
 
     void CsvExportModel::onWorkerFinished() {
         LOG_DEBUG << "#";
