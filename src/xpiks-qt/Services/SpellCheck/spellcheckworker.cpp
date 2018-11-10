@@ -25,7 +25,7 @@
 #include <QtDebug>
 #include <QtGlobal>
 
-#include <vendors/hunspell-repo/src/hunspell/hunspell.hxx>
+#include <hunspell/hunspell.hxx>
 
 #include "Artworks/artworkmetadata.h"  // IWYU pragma: keep
 #include "Artworks/artworkssnapshot.h"

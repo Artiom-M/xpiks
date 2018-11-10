@@ -20,8 +20,6 @@
 #include "Commands/commandmanager.h"
 #include "Common/flags.h"
 #include "Connectivity/requestsservice.h"
-#include "Connectivity/telemetryservice.h"
-#include "Connectivity/updateservice.h"
 #include "Encryption/secretsmanager.h"
 #include "Helpers/asynccoordinator.h"
 #include "Helpers/helpersqmlwrapper.h"
@@ -212,8 +210,6 @@ protected:
     QMLExtensions::ImageCachingService m_ImageCachingService;
     Translation::TranslationService m_TranslationService;
     QMLExtensions::VideoCachingService m_VideoCachingService;
-    Connectivity::UpdateService m_UpdateService;
-    Connectivity::TelemetryService m_TelemetryService;
     Services::ArtworksEditingHub m_EditingHub;
 
     // connectivity

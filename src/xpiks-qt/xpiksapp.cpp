@@ -54,8 +54,6 @@
 #include "Common/types.h"
 #include "Connectivity/analyticsuserevent.h"
 #include "Connectivity/requestsservice.h"
-#include "Connectivity/telemetryservice.h"
-#include "Connectivity/updateservice.h"
 #include "Encryption/aes-qt.h"
 #include "Filesystem/directoriescollection.h"
 #include "Filesystem/filescollection.h"
@@ -174,8 +172,6 @@ XpiksApp::XpiksApp(Common::ISystemEnvironment &environment):
     m_ImageCachingService(environment),
     m_TranslationService(),
     m_VideoCachingService(environment, m_SwitcherModel),
-    m_UpdateService(environment, m_SettingsModel, m_SwitcherModel, m_MaintenanceService),
-    m_TelemetryService(m_SwitcherModel, m_SettingsModel),
     m_EditingHub(m_SpellCheckService, m_WarningsService, m_MetadataIOService, m_SettingsModel),
     // connectivity
     m_UploadInfoRepository(environment, m_SecretsManager),
@@ -216,7 +212,7 @@ XpiksApp::~XpiksApp() {
 }
 
 bool XpiksApp::getIsUpdateDownloaded() {
-    return m_UpdateService.getIsUpdateDownloaded();
+    return false;
 }
 
 bool XpiksApp::getPluginsAvailable() const {
@@ -240,7 +236,6 @@ void XpiksApp::initialize() {
     m_SettingsModel.initializeConfigs();
     m_SettingsModel.retrieveAllValues();
 
-    m_TelemetryService.initialize();
     m_UIManager.initialize();
 
     m_FtpCoordinator.reset(new libxpks::net::FtpCoordinator(m_SecretsManager, m_SettingsModel));
@@ -263,8 +258,6 @@ void XpiksApp::initialize() {
 #endif
 
     m_ColorsModel.initializeBuiltInThemes();
-
-    m_TelemetryService.setInterfaceLanguage(m_LanguagesModel.getCurrentLanguage());
     m_ColorsModel.applyTheme(m_SettingsModel.getSelectedThemeIndex());
 }
 
@@ -368,9 +361,6 @@ void XpiksApp::start() {
         QLatin1String(
     /*ignorestyle*/        "cc39a47f60e1ed812e2403b33678dd1c529f1cc43f66494998ec478a4d13496269a3dfa01f882941766dba246c76b12b2a0308e20afd84371c41cf513260f8eb8b71f8c472cafb1abf712c071938ec0791bbf769ab9625c3b64827f511fa3fbb");
     QString endpoint = Encryption::decodeText(reportingEndpoint, "reporting");
-    m_TelemetryService.setEndpoint(endpoint);
-
-    m_TelemetryService.startReporting();
     m_UploadInfoRepository.initializeStocksList(m_InitCoordinator, m_RequestsService);
     m_WarningsSettingsModel.initializeConfigs(m_RequestsService);
     m_MaintenanceService.initializeDictionaries(m_TranslationManager, m_InitCoordinator);
@@ -378,7 +368,6 @@ void XpiksApp::start() {
     m_PresetsModel.initializePresets();
     m_CsvExportModel.initializeExportPlans(m_InitCoordinator, m_RequestsService);
     m_KeywordsSuggestor.initSuggestionEngines(m_ApiClients, m_RequestsService, m_MetadataIOService);
-    m_UpdateService.initialize();
 }
 
 void XpiksApp::stop() {
@@ -399,7 +388,6 @@ void XpiksApp::stop() {
 
     m_ImageCachingService.stopService();
     m_VideoCachingService.stopService();
-    m_UpdateService.stopChecking();
     m_MetadataIOService.stopService();
 
     m_SpellCheckService.stopService();
@@ -413,8 +401,6 @@ void XpiksApp::stop() {
     m_DatabaseManager.prepareToFinalize();
 
     // we have a second for important? stuff
-    m_TelemetryService.reportAction(Connectivity::UserAction::Close);
-    m_TelemetryService.stopReporting();
     m_RequestsService.stopService();
 }
 
@@ -450,12 +436,10 @@ void XpiksApp::shutdown() {
     }
     QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 
-    m_UpdateService.tryToUpgradeXpiks();
 }
 
 void XpiksApp::upgradeNow() {
     LOG_DEBUG << "#";
-    m_UpdateService.setHaveUpgradeConsent();
     emit upgradeInitiated();
 }
 
@@ -560,7 +544,6 @@ void XpiksApp::afterServicesStarted() {
     m_SwitcherModel.afterInitializedCallback();
 #endif
 
-    m_UpdateService.startChecking();
 
     executeMaintenanceJobs();
 }
@@ -635,18 +618,8 @@ void XpiksApp::connectEntitiesSignalsSlots() {
     QObject::connect(&m_UndoRedoManager, &UndoRedo::UndoRedoManager::undoStackEmpty,
                      &m_ArtworksRepository, &Models::ArtworksRepository::onUndoStackEmpty);
 
-    QObject::connect(&m_SettingsModel, &Models::SettingsModel::userStatisticsChanged,
-                     &m_TelemetryService, &Connectivity::TelemetryService::changeReporting);
-
     QObject::connect(&m_LanguagesModel, &Models::LanguagesModel::languageChanged,
                      &m_KeywordsSuggestor, &Suggestion::KeywordsSuggestor::onLanguageChanged);
-
-    QObject::connect(&m_UpdateService, &Connectivity::UpdateService::updateAvailable,
-                     &m_HelpersQmlWrapper, &Helpers::HelpersQmlWrapper::updateAvailable);
-    QObject::connect(&m_UpdateService, &Connectivity::UpdateService::updateDownloaded,
-                     this, &XpiksApp::isUpdateDownloadedChanged);
-    QObject::connect(&m_UpdateService, &Connectivity::UpdateService::updateDownloaded,
-                     &m_HelpersQmlWrapper, &Helpers::HelpersQmlWrapper::updateDownloaded);
 
     QObject::connect(&m_WarningsService, &Warnings::WarningsService::queueIsEmpty,
                      &m_WarningsModel, &Warnings::WarningsModel::onWarningsUpdateRequired);
@@ -865,9 +838,6 @@ void XpiksApp::registerUIMiddlewares() {
 
 void XpiksApp::setupMessaging() {
     LOG_DEBUG << "#";
-    Common::connectTarget<Common::NamedType<Connectivity::UserAction>>(
-                m_TelemetryService,
-    { m_ArtworksUploader, m_KeywordsSuggestor });
 
     Common::connectTarget<std::shared_ptr<Models::ICurrentEditable>>(
                 m_CurrentEditableModel,

@@ -12,10 +12,6 @@ TARGET = Xpiks
 }
 #CONFIG += force_debug_info
 
-CONFIG(release, debug|release)  {
-    CONFIG += separate_debug_info
-}
-
 VERSION = 1.5.2.2
 QMAKE_TARGET_PRODUCT = Xpiks
 QMAKE_TARGET_DESCRIPTION = "Cross-Platform Image Keywording Software"
@@ -68,11 +64,7 @@ SOURCES += main.cpp \
     Connectivity/simplecurldownloader.cpp \
     Connectivity/simplecurlrequest.cpp \
     Connectivity/switcherconfig.cpp \
-    Connectivity/telemetryservice.cpp \
-    Connectivity/telemetryworker.cpp \
     Connectivity/testconnection.cpp \
-    Connectivity/updatescheckerworker.cpp \
-    Connectivity/updateservice.cpp \
     Connectivity/uploadwatcher.cpp \
     Encryption/aes-qt.cpp \
     Encryption/obfuscation.cpp \
@@ -100,7 +92,6 @@ SOURCES += main.cpp \
     Helpers/stringhelper.cpp \
     Helpers/threadhelpers.cpp \
     Helpers/uihelpers.cpp \
-    Helpers/updatehelpers.cpp \
     Helpers/ziphelper.cpp \
     KeywordsPresets/presetgroupsmodel.cpp \
     KeywordsPresets/presetkeywordsmodel.cpp \
@@ -301,10 +292,7 @@ HEADERS += \
     Commands/UI/sourcetargetcommand.h \
     Common/abstractlistmodel.h \
     Helpers/constants.h \
-    Models/artworkuploader.h \
-    Models/uploadinfo.h \
     Models/exportinfo.h \
-    Models/uploadinforepository.h \
     Models/logsmodel.h \
     Encryption/aes-qt.h \
     ../../vendors/tiny-aes/aes.h \
@@ -313,22 +301,10 @@ HEADERS += \
     Helpers/stringhelper.h \
     Helpers/logger.h \
     Commands/commandmanager.h \
-    UndoRedo/historyitem.h \
     UndoRedo/undoredomanager.h \
-    UndoRedo/addartworksitem.h \
-    Commands/commandbase.h \
-    Commands/addartworkscommand.h \
-    Common/baseentity.h \
-    Commands/removeartworkscommand.h \
-    UndoRedo/removeartworksitem.h \
     UndoRedo/artworkmetadatabackup.h \
-    UndoRedo/modifyartworkshistoryitem.h \
-    Commands/combinededitcommand.h \
-    Commands/pastekeywordscommand.h \
     Helpers/runguard.h \
-    Models/ziparchiver.h \
     Helpers/ziphelper.h \
-    Common/basickeywordsmodel.h \
     Suggestion/keywordssuggestor.h \
     Suggestion/suggestionartwork.h \
     Models/settingsmodel.h \
@@ -363,11 +339,7 @@ HEADERS += \
     Connectivity/simplecurldownloader.h \
     Connectivity/simplecurlrequest.h \
     Connectivity/switcherconfig.h \
-    Connectivity/telemetryservice.h \
-    Connectivity/telemetryworker.h \
     Connectivity/testconnection.h \
-    Connectivity/updatescheckerworker.h \
-    Connectivity/updateservice.h \
     Connectivity/uploadwatcher.h \
     Encryption/aes-qt.h \
     Encryption/isecretsstorage.h \
@@ -404,7 +376,6 @@ HEADERS += \
     Helpers/stringhelper.h \
     Helpers/threadhelpers.h \
     Helpers/uihelpers.h \
-    Helpers/updatehelpers.h \
     Helpers/ziphelper.h \
     KeywordsPresets/groupmodel.h \
     KeywordsPresets/ipresetsmanager.h \
@@ -764,7 +735,6 @@ LIBS += -lface
 LIBS += -lssdll
 LIBS += -lquazip5
 LIBS += -lz
-LIBS += -lthmbnlr
 LIBS += -lxpks
 LIBS += -lchillout
 LIBS += -ldl
@@ -772,7 +742,7 @@ LIBS += -ldl
 BUILDNO=$$system(git log -n 1 --pretty=format:"%h")
 BRANCH_NAME=$$system(git rev-parse --abbrev-ref HEAD)
 
-include(../xpiks-common/xpiks-common.pri)
+#include(../xpiks-common/xpiks-common.pri)
 
 DEFINES += WITH_UPDATES
 DEFINES += WITH_LOGS
@@ -790,6 +760,9 @@ CONFIG(debug, debug|release)  {
 }
 
 macx {
+    CONFIG(release, debug|release)  {
+        CONFIG += separate_debug_info
+    }
     QMAKE_TARGET_BUNDLE_PREFIX = com.xpiksapp
     QMAKE_BUNDLE = Xpiks
 
@@ -825,44 +798,7 @@ macx {
     QMAKE_BUNDLE_DATA += RECOVERTY
 }
 
-win32 {
-    DEFINES += QT_NO_PROCESS_COMBINED_ARGUMENT_START
-    QT += winextras
-    DEFINES += ZLIB_WINAPI \
-               ZLIB_DLL
-    INCLUDEPATH += "../../vendors/zlib-1.2.11"
-    INCLUDEPATH += "../../vendors/libcurl/include"
-
-    LIBS -= -lcurl
-
-    LIBS += -lavcodec
-    LIBS += -lavfilter
-    LIBS += -lavformat
-    LIBS += -lavutil
-    LIBS += -lswscale
-
-    CONFIG(debug, debug|release) {
-        LIBS += -llibcurl_debug
-        LIBS -= -lquazip
-        LIBS += -lquazipd
-    }
-
-    CONFIG(release, debug|release) {
-        LIBS += -llibcurl
-    }
-
-    LIBS += -lmman
-    # chillout deps
-    LIBS += -lAdvapi32 -lDbgHelp
-
-    # recoverty steps
-    RECOVERTY_DIR = recoverty
-    copyrecoverty.commands = $(COPY_FILE) \"$$shell_path($$DEPS_DIR/$$RECOVERTY_DIR/Recoverty*)\" \"$$shell_path($$OUT_PWD/$$EXE_DIR/)\"
-    QMAKE_EXTRA_TARGETS += copyrecoverty
-    POST_TARGETDEPS += copyrecoverty
-}
-
-travis-ci {
+    travis-ci {
     message("for Travis CI")
     LIBS += -L"$$PWD/../../libs"
     LIBS -= -lz
@@ -870,7 +806,7 @@ travis-ci {
     LIBS += -ldl
     DEFINES += TRAVIS_CI
     INCLUDEPATH += "../../vendors/quazip"
-
+}
 
 unix:!macx {
     message("for Linux")
@@ -878,15 +814,14 @@ unix:!macx {
 
     QML_IMPORT_PATH += /usr/lib/x86_64-linux-gnu/qt5/imports/
     LIBS += -L/lib/x86_64-linux-gnu/
-    BUILDNO = $$system($$PWD/buildno.sh)
+    BUILDNO = $$system($$PWD/../../scripts/build/buildno.sh)
 
     UNAME = $$system(cat /proc/version | tr -d \'()\')
-    #QMAKE_PRE_LINK=$$PWD/build_vendors_linux.sh
 }
 
 linux-qtcreator {
     message("in QtCreator")
-    BUILDNO = $$system($$PWD/buildno.sh)
+    BUILDNO = $$system($$PWD/../../scripts/build/buildno.sh)
     LIBS += -L/usr/lib64/
     LIBS += -L/lib/x86_64-linux-gnu/
     copywhatsnew.commands = $(COPY_FILE) "$$PWD/deps/whatsnew.txt" "$$OUT_PWD/"
@@ -906,6 +841,7 @@ with-video {
     LIBS += -lthmbnlr
 
     SOURCES += ../../vendors/libthmbnlr/thumbnailcreator_stub.cpp
+    DEFINES += WITH_VIDEO
 }
 
 DEFINES += BUILDNUMBER=$${BUILDNO}

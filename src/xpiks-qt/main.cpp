@@ -31,11 +31,6 @@
 #include <QString>
 #include <QSysInfo>
 #include <QUrl>
-#include <QDir>
-#include <QtQml>
-#include <QFile>
-#include <QUuid>
-#include <QScreen>
 #include <QtDebug>
 #include <QtGlobal>
 
@@ -48,28 +43,6 @@
 #include "Common/systemenvironment.h"
 #include "Common/version.h"
 #include "Connectivity/curlinithelper.h"
-#include "Connectivity/updateservice.h"
-#include "Helpers/helpersqmlwrapper.h"
-#include "Encryption/secretsmanager.h"
-#include "Models/artworksrepository.h"
-#include "QMLExtensions/colorsmodel.h"
-#include "Models/artworkproxymodel.h"
-#include "Warnings/warningsservice.h"
-#include "UndoRedo/undoredomanager.h"
-#include "Models/recentfilesmodel.h"
-#include "QuickBuffer/quickbuffer.h"
-#include "Helpers/clipboardhelper.h"
-#include "Commands/commandmanager.h"
-#include "QMLExtensions/tabsmodel.h"
-#include "Models/artworkuploader.h"
-#include "Warnings/warningsmodel.h"
-#include "Plugins/pluginmanager.h"
-#include "Helpers/loggingworker.h"
-#include "Models/languagesmodel.h"
-#include "Models/sessionmanager.h"
-#include "Models/artitemsmodel.h"
-#include "Models/settingsmodel.h"
-#include "Models/ziparchiver.h"
 #include "Helpers/constants.h"
 #include "Helpers/globalimageprovider.h"
 #include "Helpers/logger.h"
@@ -85,7 +58,6 @@ class QQmlContext;
 #ifdef Q_OS_LINUX
 #include <unistd.h>
 #endif
-    }
 
 #ifndef Q_OS_LINUX
 #include <QProcess>
@@ -111,13 +83,6 @@ void initQSettings() {
     QString appVersion(STRINGIZE(BUILDNUMBER));
     QCoreApplication::setApplicationVersion(XPIKS_VERSION_STRING " " STRINGIZE(XPIKS_VERSION_SUFFIX) " - " +
                                             appVersion.left(10));
-}
-
-void ensureUserIdExists(Models::SettingsModel *settings) {
-    if (settings->getUserAgentId().isEmpty()) {
-        QUuid uuid = QUuid::createUuid();
-        settings->setUserAgentId(uuid.toString());
-    }
 }
 
 void setHighDpiEnvironmentVariable() {
@@ -249,23 +214,8 @@ int main(int argc, char *argv[]) {
 
     LOG_INFO << "Log started. Today is" << QDateTime::currentDateTimeUtc().toString("dd.MM.yyyy");
     LOG_INFO << "Xpiks" << XPIKS_FULL_VERSION_STRING << "-" << STRINGIZE(BUILDNUMBER);
-
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 4, 0))
     LOG_INFO << QSysInfo::productType() << QSysInfo::productVersion() << QSysInfo::currentCpuArchitecture();
-#else
-#ifdef Q_OS_WIN
-    LOG_INFO << QLatin1String("Windows Qt<5.4");
-#elsif Q_OS_DARWIN
-    LOG_INFO << QLatin1String("OS X Qt<5.4");
-#else
-    LOG_INFO << QLatin1String("LINUX Qt<5.4");
-#endif
-#endif
-
-    QApplication app(argc, argv);
-
     LOG_INFO << "Working directory of Xpiks is:" << QDir::currentPath();
-    LOG_DEBUG << "Extra files search locations:" << QStandardPaths::standardLocations(XPIKS_DATA_LOCATION_TYPE);
 
     xpiks.initialize();
 
@@ -280,12 +230,6 @@ int main(int argc, char *argv[]) {
 
     engine.addImageProvider("global", globalProvider);
     engine.addImageProvider("cached", cachingProvider);
-
-    uiManager.addSystemTab(FILES_FOLDERS_TAB_ID, "qrc:/CollapserTabs/FilesFoldersIcon.qml", "qrc:/CollapserTabs/FilesFoldersTab.qml");
-    uiManager.addSystemTab(QUICKBUFFER_TAB_ID, "qrc:/CollapserTabs/QuickBufferIcon.qml", "qrc:/CollapserTabs/QuickBufferTab.qml");
-    uiManager.addSystemTab(TRANSLATOR_TAB_ID, "qrc:/CollapserTabs/TranslatorIcon.qml", "qrc:/CollapserTabs/TranslatorTab.qml");
-    uiManager.initializeSystemTabs();
-    uiManager.initializeState();
 
     LOG_DEBUG << "About to load main view...";
     engine.load(QUrl(QStringLiteral("qrc:/main.qml")));

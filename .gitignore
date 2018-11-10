@@ -3,6 +3,7 @@ src/*/Makefile
 vendors/*/Makefile
 src/xpiks-qt/build*
 src/xpiks-qt/BUILDNO
+src/xpiks-qt/Xpiks*
 *.pro.user
 *.autosave
 src/xpiks-tests/build-*

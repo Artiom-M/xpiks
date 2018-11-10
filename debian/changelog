@@ -1,6 +1,5 @@
-xpiks (1.4.2) UNRELEASED; urgency=medium
+xpiks (1.5.2) UNRELEASED; urgency=medium
 
-  [ Artiom ]
     * Major features:
 
     presets for keywords #207
@@ -23,7 +22,7 @@ xpiks (1.4.2) UNRELEASED; urgency=medium
     dismiss timeout setting change didn't work as expected #301
 
 
- -- artiom <a.mv@gmx.fr>  Sun, 04 Nov 2018 22:30:31 +1100
+ -- Artiom <a.mv@gmx.fr>  Sat, 10 Nov 2018 20:24:07 +1100
 
 xpiks (1.3.4) testing; urgency=medium
 

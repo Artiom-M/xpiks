@@ -146,7 +146,7 @@ namespace QMLExtensions {
 
     bool VideoCachingWorker::createThumbnail(std::shared_ptr<VideoCacheRequest> &item, std::vector<uint8_t> &buffer, int &width, int &height) {
         bool thumbnailCreated = false;
-
+#ifdef WITH_VIDEO
         const QString &originalPath = item->getFilepath();
         const QString filepath = QDir::toNativeSeparators(originalPath);
 #ifdef Q_OS_WIN
@@ -169,7 +169,7 @@ namespace QMLExtensions {
         } catch (...) {
             LOG_WARNING << "Unknown exception while creating thumbnail";
         }
-
+#endif
         return thumbnailCreated;
     }
 
