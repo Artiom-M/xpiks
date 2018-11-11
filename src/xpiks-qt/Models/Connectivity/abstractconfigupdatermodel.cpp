@@ -45,16 +45,20 @@ namespace Models {
 
     void AbstractConfigUpdaterModel::remoteConfigArrived() {
         LOG_DEBUG << "#";
+#ifdef REMOTE_CONFIG
         const QJsonDocument &remoteDocument = m_RemoteConfig.getConfig();
+#else
+        const QJsonDocument &remoteDocument = QJsonDocument::fromJson("{}\n");
+#endif
         processRemoteConfig(remoteDocument, m_ForceOverwrite);
     }
 
     void AbstractConfigUpdaterModel::processRemoteConfig(const QJsonDocument &remoteDocument, bool overwriteLocal) {
+
         LOG_DEBUG << "#";
         QJsonDocument document = m_LocalConfig.readConfig();
         Helpers::mergeJson(remoteDocument, document, overwriteLocal, *this);
         m_LocalConfig.writeConfig(document);
-
         processMergedConfig(document);
     }
 

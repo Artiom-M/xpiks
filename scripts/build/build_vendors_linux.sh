@@ -99,7 +99,7 @@ echo -e "${PRINT_PREFIX} Building cpp-libface... - done."
 ### chillout
 echo -e "${PRINT_PREFIX} Building chillout..."
 cd ${ROOT_DIR}/vendors/chillout/src/chillout
-qmake "CONFIG+=${TARGET}" chillout.pro
+qmake "CONFIG+=${TARGET}" libchillout.pro
 make ${MAKE_FLAGS}
 cp libchillout.a ${ROOT_DIR}/libs/${TARGET}
 echo -e "${PRINT_PREFIX} Building chillout... - done."

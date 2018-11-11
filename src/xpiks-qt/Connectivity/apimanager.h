@@ -39,28 +39,52 @@ namespace Connectivity {
 
     public:
         QString getUpdateAddr() const {
+#ifdef REMOTE_CONFIG
             return m_BaseUrl + QLatin1String(UPDATE_JSON_URL_SUFFIX);
+#else
+            return QString();
+#endif
         }
 
         QString getDefaultUpdateAddr() const {
+#ifdef REMOTE_CONFIG
             return m_BaseUrl + "update.json";
+#else
+            return QString();
+#endif
         }
 
         QString getStocksACSourceAddr() const {
+#ifdef REMOTE_CONFIG
             return m_BaseUrl + "stocks_ftp.json";
+#else
+            return QString();
+#endif
         }
 
         QString getWarningSettingsAddr() const {
+#ifdef REMOTE_CONFIG
             return m_BaseUrl + "warnings_settings.json";
+#else
+            return QString();
+#endif
         }
 
         QString getSwitcherAddr() {
+#ifdef REMOTE_CONFIG
             QString filename = QString("switches_%1.json").arg(XPIKS_API_VERSION_STRING);
             return m_BaseUrl + filename;
+#else
+            return QString();
+#endif
         }
 
         QString getCsvExportPlansAddr() {
+#ifdef REMOTE_CONFIG
             return m_BaseUrl + "csv_export_plans.json";
+#else
+            return QString();
+#endif
         }
 
     private:
@@ -70,7 +94,6 @@ namespace Connectivity {
 #else
             m_BaseUrl = "https://ribtoks.github.io/xpiks/api/v1/";
 #endif
-            m_BaseUrl = "http://localhost/";
         }
 
         ApiManager(ApiManager const&);

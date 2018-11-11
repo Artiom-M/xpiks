@@ -74,6 +74,7 @@ namespace Helpers {
         QFile file(m_FilePath);
 
         if (file.open(QIODevice::WriteOnly)) {
+            LOG_DEBUG << "Writing Config file : " << m_FilePath ;
             file.write(config.toJson(QJsonDocument::Indented));
             file.close();
             success = true;

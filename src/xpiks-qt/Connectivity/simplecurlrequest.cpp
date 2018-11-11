@@ -88,6 +88,10 @@ namespace Connectivity {
             return false;
         }
 
+        if (m_RemoteResource.isNull()) {
+            return false;
+        }
+
         std::string resourceString = m_RemoteResource.toStdString();
         const char *url = resourceString.data();
         /* specify URL to get */
